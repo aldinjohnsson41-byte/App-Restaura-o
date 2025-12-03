@@ -153,9 +153,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
     setShowForm(true);
   }
 
-  function setShowForm(val: boolean) {
-    setShowFormState(val);
-  }
+  
 
   const [showFormState, setShowFormState] = useState(false);
 
