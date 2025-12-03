@@ -53,7 +53,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
   const [loading, setLoading] = useState(false);
 
   // Form
-  const [showFormState, setShowForm] = useState(false);
+  const [showFormShowForm] = useState(false);
   const [editing, setEditing] = useState<GrupoWithDetails | null>(null);
   const [form, setForm] = useState({
     nome: '',
@@ -153,6 +153,9 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
     setShowForm(true);
   }
 
+  
+
+  const [showForm, setShowForm] = useState(false);
 
   // editar
   async function handleEdit(grupo: GrupoWithDetails) {
@@ -188,7 +191,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
     setOcorrencias(ocorrs || []);
 
     setError('');
-    setShowFormState(true);
+    setShowForm(true);
   }
 
   // salvar grupo (create/update)
@@ -309,7 +312,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
       // carregar dados atualizados
       await loadPessoas();
       await loadGrupos();
-      setShowFormState(false);
+      setShowForm(false);
       setEditing(null);
     } catch (err: any) {
       console.error(err);
@@ -442,7 +445,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
           <h2 className="text-2xl font-bold text-slate-900">Grupos Familiares</h2>
           <p className="text-slate-600 text-sm">Gerencie células, líderes, membros e ocorrências</p>
         </div>
-        {!showFormState && (
+        {!showForm && (
           <button onClick={handleNew} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition flex items-center gap-2">
             <Plus className="w-4 h-4" />
             Novo Grupo
@@ -450,7 +453,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
         )}
       </div>
 
-      {showFormState && (
+      {showForm && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-6">{editing ? 'Editar Grupo Familiar' : 'Novo Grupo Familiar'}</h3>
 
@@ -532,7 +535,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
             {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
 
             <div className="flex gap-3 justify-end">
-              <button type="button" onClick={() => { setShowFormState(false); setEditing(null); setError(''); }} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition flex items-center gap-2"><X className="w-4 h-4" /> Cancelar</button>
+              <button type="button" onClick={() => { setShowForm(false); setEditing(null); setError(''); }} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition flex items-center gap-2"><X className="w-4 h-4" /> Cancelar</button>
               <button type="submit" disabled={loading} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-2"><Save className="w-4 h-4" /> {loading ? 'Salvando...' : 'Salvar'}</button>
             </div>
           </form>
@@ -591,11 +594,11 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
       )}
 
       {/* listagem */}
-      {loading && !showFormState ? (
+      {loading && !showForm ? (
         <div className="text-center py-12">
           <p className="text-slate-600">Carregando...</p>
         </div>
-      ) : grupos.length === 0 && !showFormState ? (
+      ) : grupos.length === 0 && !showForm ? (
         <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
           <UsersRound className="w-16 h-16 text-slate-400 mx-auto mb-4" />
           <p className="text-slate-600 mb-4">Nenhum grupo familiar cadastrado</p>
