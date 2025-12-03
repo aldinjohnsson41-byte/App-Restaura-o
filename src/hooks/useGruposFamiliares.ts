@@ -184,7 +184,7 @@ export function useGruposFamiliares() {
       await supabase.from('grupo_membros_historico').insert({
         grupo_id: grupoId,
         pessoa_id: id,
-        acao: 'promovido',
+        acao: 'Promovido',
         papel,
         data: now,
         nota: 'Definido como liderança'
