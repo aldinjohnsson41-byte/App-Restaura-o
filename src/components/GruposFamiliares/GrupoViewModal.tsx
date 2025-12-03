@@ -33,15 +33,27 @@ export default function GrupoViewModal({
   const [loading, setLoading] = useState(false);
   const [grupoAtualizado, setGrupoAtualizado] = useState<GrupoWithCounts | null>(grupo);
 
-  // Carregar dados quando o modal abre
+  // Carregar dados quando o modal abre ou quando o grupo muda
   useEffect(() => {
     if (grupo?.id) {
+      setGrupoAtualizado(grupo);
       loadGrupoData();
     }
   }, [grupo?.id]);
 
   const loadGrupoData = async () => {
     if (!grupo?.id) return;
+    
+    // Recarregar dados do grupo
+    const { data: grupoData } = await supabase
+      .from('grupos_familiares')
+      .select('*')
+      .eq('id', grupo.id)
+      .single();
+    
+    if (grupoData) {
+      setGrupoAtualizado({ ...grupoData, membros_count: grupo.membros_count });
+    }
     
     const { data: membrosData } = await supabase
       .from('pessoas')
@@ -272,9 +284,11 @@ export default function GrupoViewModal({
         <div className="p-6 border-b border-slate-200">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-2xl font-bold text-slate-900">{grupo.nome}</h3>
+              <h3 className="text-2xl font-bold text-slate-900">
+                {grupoAtualizado?.nome || grupo?.nome}
+              </h3>
               <p className="text-sm text-slate-500 mt-1">
-                {grupo.membros_count || 0} membro(s)
+                {grupoAtualizado?.membros_count || grupo?.membros_count || 0} membro(s)
               </p>
             </div>
             <div className="flex gap-2">
@@ -316,9 +330,9 @@ export default function GrupoViewModal({
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
-          {activeTab === 'dados' && (
+          {activeTab === 'dados' && grupoAtualizado && (
             <DadosTab
-              grupo={grupo}
+              grupo={grupoAtualizado}
               membros={membros}
               onChangeLeadership={handleChangeLeadership}
               pessoaNomeById={pessoaNomeById}
