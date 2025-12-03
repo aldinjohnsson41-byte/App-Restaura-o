@@ -31,6 +31,7 @@ export default function GrupoViewModal({
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
   const [historico, setHistorico] = useState<MembroHistorico[]>([]);
   const [loading, setLoading] = useState(false);
+  const [grupoAtualizado, setGrupoAtualizado] = useState<GrupoWithCounts | null>(grupo);
 
   // Carregar dados quando o modal abre
   useEffect(() => {
