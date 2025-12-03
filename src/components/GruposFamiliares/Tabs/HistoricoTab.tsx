@@ -34,12 +34,12 @@ export default function HistoricoTab({ historico, formatDate }: HistoricoTabProp
         return 'bg-green-100 text-green-700 border-green-200';
       case 'removido':
         return 'bg-red-100 text-red-700 border-red-200';
-      case 'promovido':
+      case 'Promovido':
         return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'rebaixado':
+      case 'Rebaixado':
         return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'lider_alterado':
-      case 'co_lider_alterado':
+      case 'Lider alterado':
+      case 'Co lider alterado':
         return 'bg-purple-100 text-purple-700 border-purple-200';
       default:
         return 'bg-slate-100 text-slate-700 border-slate-200';
