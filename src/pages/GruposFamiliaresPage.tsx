@@ -53,7 +53,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
   const [loading, setLoading] = useState(false);
 
   // Form
-  const [showForm, setShowForm] = useState(false);
+  const [showFormState, setShowForm] = useState(false);
   const [editing, setEditing] = useState<GrupoWithDetails | null>(null);
   const [form, setForm] = useState({
     nome: '',
@@ -150,7 +150,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
     setForm({ nome: '', descricao: '', lider_1_id: '', lider_2_id: '', co_lider_1_id: '', co_lider_2_id: '', membros_ids: [] });
     setOcorrencias([]);
     setError('');
-    setShowForm(true);
+    setShowFormState(true);
   }
 
   
