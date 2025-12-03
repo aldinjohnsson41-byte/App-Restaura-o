@@ -90,13 +90,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
   async function loadGrupos() {
     const { data, error } = await supabase
       .from('grupos_familiares')
-.select(`
-  *,
-  lider_1:id_lider_1_id ( id, nome_completo ),
-  lider_2:lider_2_id ( id, nome_completo ),
-  co_lider_1:co_lider_1_id ( id, nome_completo ),
-  co_lider_2:co_lider_2_id ( id, nome_completo )
-`)
+      .select('*')
       .order('nome');
 
     if (error) {
