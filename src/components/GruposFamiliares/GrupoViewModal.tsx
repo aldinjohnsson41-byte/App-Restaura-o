@@ -137,9 +137,14 @@ export default function GrupoViewModal({
       const newName = pessoaId ? (pessoas.find(p => p.id === pessoaId)?.nome_completo || 'Desconhecido') : 'Ninguém';
       
       // Atualizar a tabela grupos_familiares
-      await supabase.from('grupos_familiares').update({
-        [field]: pessoaId || null
-      }).eq('id', grupo.id);
+      const { data: updatedGrupo, error: updateError } = await supabase
+        .from('grupos_familiares')
+        .update({ [field]: pessoaId || null })
+        .eq('id', grupo.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
 
       // Se foi definida nova liderança, atualizar pessoa
       if (pessoaId) {
@@ -174,11 +179,14 @@ export default function GrupoViewModal({
         pessoa_id: pessoaId || prevValue || null,
         acao: field.startsWith('co_') ? 'co_lider_alterado' : 'lider_alterado',
         papel: field.startsWith('co_') ? 'co-líder' : 'líder',
-        data: data, // Usar a data fornecida pelo usuário
+        data: data,
         nota: descricaoCompleta
       });
 
+      // Recarregar todos os dados do grupo
       await loadGrupoData();
+      
+      // Recarregar a lista de grupos na página principal
       onReload();
     } catch (e) {
       console.error(e);
