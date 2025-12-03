@@ -47,7 +47,7 @@ export default function HistoricoTab({ historico, formatDate }: HistoricoTabProp
   };
 
   const getSuccessIcon = (acao?: string) => {
-    const successActions = ['adicionado', 'promovido', 'lider_alterado', 'co_lider_alterado'];
+    const successActions = ['Adicionado', 'Promovido', 'Lider Alterado', 'Co lider alterado'];
     return successActions.includes(acao || '');
   };
 
