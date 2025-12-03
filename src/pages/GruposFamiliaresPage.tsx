@@ -150,7 +150,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
     setForm({ nome: '', descricao: '', lider_1_id: '', lider_2_id: '', co_lider_1_id: '', co_lider_2_id: '', membros_ids: [] });
     setOcorrencias([]);
     setError('');
-    setShowFormState(true);
+    setShowForm(true);
   }
 
 
