@@ -97,7 +97,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
   co_lider_1:co_lider_1_id ( id, nome_completo ),
   co_lider_2:co_lider_2_id ( id, nome_completo )
 `)
-
+      .order('nome');
 
     if (error) {
       console.error('Erro ao carregar grupos', error);
