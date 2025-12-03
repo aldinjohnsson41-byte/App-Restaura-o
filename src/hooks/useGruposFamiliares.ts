@@ -286,7 +286,9 @@ export function useGruposFamiliares() {
     grupoId: string, 
     field: LeadershipField, 
     pessoaId: string,
-    prevValue: string | null
+    prevValue: string | null,
+    data: string,
+    observacao: string
   ) => {
     setLoading(true);
     try {
@@ -319,14 +321,16 @@ export function useGruposFamiliares() {
         }).eq('id', prevValue);
       }
 
-      const now = new Date().toISOString();
+      const labelField = field.replace('_id', '').replace('_', ' ');
+      const notaCompleta = observacao || `Alteração de ${labelField}`;
+      
       await supabase.from('grupo_membros_historico').insert({
         grupo_id: grupoId,
         pessoa_id: pessoaId || null,
         acao: field.startsWith('co_') ? 'co_lider_alterado' : 'lider_alterado',
         papel: field.startsWith('co_') ? 'co-líder' : 'líder',
-        data: now,
-        nota: `Campo ${field} atualizado para pessoa ${pessoaId || '—'}`
+        data: data,
+        nota: notaCompleta
       });
 
       await loadPessoas();
