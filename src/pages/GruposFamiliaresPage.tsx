@@ -98,8 +98,35 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
       return;
     }
 
-    // contar membros por grupo
-    const gruposWithCounts = await Promise.all((data || []).map(async (g: any) => {
+    // se trouxe dados, precisamos buscar os nomes dos líderes (evita joins falhos no banco)
+    const groups = data || [];
+
+    // coletar todos os ids de liderança que aparecem nos grupos
+    const leaderIdsSet = new Set<string>();
+    groups.forEach((g: any) => {
+      if (g.lider_1_id) leaderIdsSet.add(g.lider_1_id);
+      if (g.lider_2_id) leaderIdsSet.add(g.lider_2_id);
+      if (g.co_lider_1_id) leaderIdsSet.add(g.co_lider_1_id);
+      if (g.co_lider_2_id) leaderIdsSet.add(g.co_lider_2_id);
+    });
+
+    const leaderIds = Array.from(leaderIdsSet);
+    let leadersMap: Record<string, any> = {};
+
+    if (leaderIds.length > 0) {
+      const { data: leadersData } = await supabase
+        .from('pessoas')
+        .select('id, nome_completo, telefone')
+        .in('id', leaderIds);
+
+      leadersMap = (leadersData || []).reduce((acc: any, cur: any) => {
+        acc[cur.id] = cur;
+        return acc;
+      }, {} as Record<string, any>);
+    }
+
+    // contar membros por grupo e anexar líderes a partir do mapa
+    const gruposWithCounts = await Promise.all(groups.map(async (g: any) => {
       const { count } = await supabase
         .from('pessoas')
         .select('*', { head: true, count: 'exact' })
@@ -107,15 +134,16 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
 
       return {
         ...g,
-        lider_1: Array.isArray(g.lider_1) ? g.lider_1[0] : g.lider_1,
-        lider_2: Array.isArray(g.lider_2) ? g.lider_2[0] : g.lider_2,
-        co_lider_1: Array.isArray(g.co_lider_1) ? g.co_lider_1[0] : g.co_lider_1,
-        co_lider_2: Array.isArray(g.co_lider_2) ? g.co_lider_2[0] : g.co_lider_2,
+        lider_1: g.lider_1_id ? leadersMap[g.lider_1_id] || null : null,
+        lider_2: g.lider_2_id ? leadersMap[g.lider_2_id] || null : null,
+        co_lider_1: g.co_lider_1_id ? leadersMap[g.co_lider_1_id] || null : null,
+        co_lider_2: g.co_lider_2_id ? leadersMap[g.co_lider_2_id] || null : null,
         membros_count: count || 0
       } as GrupoWithDetails;
     }));
 
     setGrupos(gruposWithCounts || []);
+  }
   }
 
   async function loadPessoas() {
@@ -149,9 +177,9 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
 
   
 
+  const [showForm, setShowForm] = useState(false);
 
-
-
+  // editar
   async function handleEdit(grupo: GrupoWithDetails) {
     setEditing(grupo);
     setForm({
@@ -588,61 +616,63 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
       )}
 
       {/* listagem */}
-      {loading && !showForm ? (
-        <div className="text-center py-12">
-          <p className="text-slate-600">Carregando...</p>
-        </div>
-      ) : grupos.length === 0 && !showForm ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
-          <UsersRound className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-          <p className="text-slate-600 mb-4">Nenhum grupo familiar cadastrado</p>
-          <button onClick={handleNew} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Cadastrar Primeiro Grupo</button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {grupos.map(grupo => (
-            <div key={grupo.id} className="bg-white border-2 border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-orange-300 transition-all">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center"><UsersRound className="w-6 h-6 text-orange-600" /></div>
-                  <div>
-                    <h3 className="font-semibold text-slate-900">{grupo.nome}</h3>
-                    <p className="text-xs text-slate-500">{grupo.membros_count} membro(s)</p>
+      {!showForm && (
+        <>
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-slate-600">Carregando...</p>
+            </div>
+          ) : grupos.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
+              <UsersRound className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-600 mb-4">Nenhum grupo familiar cadastrado</p>
+              <button onClick={handleNew} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Cadastrar Primeiro Grupo</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {grupos.map(grupo => (
+                <div key={grupo.id} className="bg-white border-2 border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-orange-300 transition-all">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center"><UsersRound className="w-6 h-6 text-orange-600" /></div>
+                      <div>
+                        <h3 className="font-semibold text-slate-900">{grupo.nome}</h3>
+                        <p className="text-xs text-slate-500">{grupo.membros_count} membro(s)</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleEdit(grupo)} title="Editar" className="p-2 rounded-md hover:bg-slate-50"><Edit className="w-4 h-4 text-slate-600" /></button>
+                      <button onClick={() => handleDelete(grupo.id)} title="Excluir" className="p-2 rounded-md hover:bg-red-50"><Trash2 className="w-4 h-4 text-red-600" /></button>
+                    </div>
+                  </div>
+
+                  {grupo.descricao && <p className="text-sm text-slate-600 mb-4 line-clamp-2">{grupo.descricao}</p>}
+
+                  <div className="space-y-2 mb-4">
+                    {grupo.lider_1 ? (
+                      <div className="flex items-center gap-2 text-sm"><User className="w-4 h-4 text-slate-400" /><span className="text-slate-600">Líder:</span><span className="text-slate-900 font-medium">{(grupo.lider_1 as any).nome_completo}</span></div>
+                    ) : (grupo.lider_2 ? (
+                      <div className="flex items-center gap-2 text-sm"><User className="w-4 h-4 text-slate-400" /><span className="text-slate-600">Líder:</span><span className="text-slate-900 font-medium">{(grupo.lider_2 as any).nome_completo}</span></div>
+                    ) : (grupo.co_lider_1 ? (
+                      <div className="flex items-center gap-2 text-sm"><User className="w-4 h-4 text-slate-400" /><span className="text-slate-600">Co-líder:</span><span className="text-slate-900 font-medium">{(grupo.co_lider_1 as any).nome_completo}</span></div>
+                    ) : (grupo.co_lider_2 ? (
+                      <div className="flex items-center gap-2 text-sm"><User className="w-4 h-4 text-slate-400" /><span className="text-slate-600">Co-líder 2:</span><span className="text-slate-900 font-medium">{(grupo.co_lider_2 as any).nome_completo}</span></div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-slate-500 italic"><User className="w-4 h-4" />Sem liderança definida</div>
+                    )))}
+                  </div>
+
+                  <div className="flex gap-2 pt-4 border-t border-slate-100">
+                    <button onClick={() => handleEdit(grupo)} className="flex-1 px-3 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition flex items-center justify-center gap-2"><Edit className="w-4 h-4" /> Editar</button>
+                    <button onClick={() => handleDelete(grupo.id)} className="flex-1 px-3 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-2"><Trash2 className="w-4 h-4" /> Excluir</button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleEdit(grupo)} title="Editar" className="p-2 rounded-md hover:bg-slate-50"><Edit className="w-4 h-4 text-slate-600" /></button>
-                  <button onClick={() => handleDelete(grupo.id)} title="Excluir" className="p-2 rounded-md hover:bg-red-50"><Trash2 className="w-4 h-4 text-red-600" /></button>
-                </div>
-              </div>
-
-              {grupo.descricao && <p className="text-sm text-slate-600 mb-4 line-clamp-2">{grupo.descricao}</p>}
-
-              <div className="space-y-2 mb-4">
-                {grupo.lider_1 && (
-                  <div className="flex items-center gap-2 text-sm"><User className="w-4 h-4 text-slate-400" /><span className="text-slate-600">Líder:</span><span className="text-slate-900 font-medium">{(grupo.lider_1 as any).nome_completo}</span></div>
-                )}
-                {grupo.lider_2 && (
-                  <div className="flex items-center gap-2 text-sm"><User className="w-4 h-4 text-slate-400" /><span className="text-slate-600">Líder 2:</span><span className="text-slate-900 font-medium">{(grupo.lider_2 as any).nome_completo}</span></div>
-                )}
-                {grupo.co_lider_1 && (
-                  <div className="flex items-center gap-2 text-sm"><User className="w-4 h-4 text-slate-400" /><span className="text-slate-600">Co-líder:</span><span className="text-slate-900 font-medium">{(grupo.co_lider_1 as any).nome_completo}</span></div>
-                )}
-                {grupo.co_lider_2 && (
-                  <div className="flex items-center gap-2 text-sm"><User className="w-4 h-4 text-slate-400" /><span className="text-slate-600">Co-líder 2:</span><span className="text-slate-900 font-medium">{(grupo.co_lider_2 as any).nome_completo}</span></div>
-                )}
-                {!grupo.lider_1 && !grupo.co_lider_1 && <div className="flex items-center gap-2 text-sm text-slate-500 italic"><User className="w-4 h-4" />Sem liderança definida</div>}
-              </div>
-
-              <div className="flex gap-2 pt-4 border-t border-slate-100">
-                <button onClick={() => handleEdit(grupo)} className="flex-1 px-3 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition flex items-center justify-center gap-2"><Edit className="w-4 h-4" /> Editar</button>
-                <button onClick={() => handleDelete(grupo.id)} className="flex-1 px-3 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-2"><Trash2 className="w-4 h-4" /> Excluir</button>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
+        </>
+      )
 
       <div className="text-sm text-slate-600">Total: {grupos.length} grupo(s) familiar(es)</div>
 
