@@ -123,16 +123,25 @@ export default function GrupoViewModal({
     }
   };
 
-  const handleChangeLeadership = async (field: LeadershipField, pessoaId: string) => {
+  const handleChangeLeadership = async (
+    field: LeadershipField, 
+    pessoaId: string, 
+    data: string, 
+    observacao: string
+  ) => {
     if (!grupo?.id) return;
     setLoading(true);
     try {
       const prevValue = (grupo as any)[field];
+      const prevName = pessoas.find(p => p.id === prevValue)?.nome_completo || 'Ninguém';
+      const newName = pessoaId ? (pessoas.find(p => p.id === pessoaId)?.nome_completo || 'Desconhecido') : 'Ninguém';
       
+      // Atualizar a tabela grupos_familiares
       await supabase.from('grupos_familiares').update({
         [field]: pessoaId || null
       }).eq('id', grupo.id);
 
+      // Se foi definida nova liderança, atualizar pessoa
       if (pessoaId) {
         const papel = field.startsWith('co_') ? 'co-líder' : 'líder';
         await supabase.from('pessoas').update({
@@ -141,6 +150,7 @@ export default function GrupoViewModal({
         }).eq('id', pessoaId);
       }
 
+      // Se havia liderança anterior e foi alterada, rebaixar
       if (prevValue && prevValue !== pessoaId) {
         const { data: stillMember } = await supabase
           .from('pessoas')
@@ -155,14 +165,17 @@ export default function GrupoViewModal({
         }).eq('id', prevValue);
       }
 
-      const now = new Date().toISOString();
+      // Registrar no histórico com data e observação personalizadas
+      const labelField = field.replace('_id', '').replace('_', ' ');
+      const descricaoCompleta = `Alteração de ${labelField}: ${prevName} → ${newName}${observacao ? `. ${observacao}` : ''}`;
+      
       await supabase.from('grupo_membros_historico').insert({
         grupo_id: grupo.id,
-        pessoa_id: pessoaId || null,
+        pessoa_id: pessoaId || prevValue || null,
         acao: field.startsWith('co_') ? 'co_lider_alterado' : 'lider_alterado',
         papel: field.startsWith('co_') ? 'co-líder' : 'líder',
-        data: now,
-        nota: `Campo ${field} atualizado`
+        data: data, // Usar a data fornecida pelo usuário
+        nota: descricaoCompleta
       });
 
       await loadGrupoData();
@@ -170,6 +183,7 @@ export default function GrupoViewModal({
     } catch (e) {
       console.error(e);
       alert('Erro ao alterar liderança');
+      throw e;
     } finally {
       setLoading(false);
     }
@@ -216,7 +230,13 @@ export default function GrupoViewModal({
   const formatDate = (iso?: string | null) => {
     if (!iso) return '—';
     try {
-      return new Date(iso).toLocaleString();
+      return new Date(iso).toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     } catch {
       return iso;
     }
