@@ -153,9 +153,6 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
     setShowFormState(true);
   }
 
-  
-
-  const [showFormState, setShowFormState] = useState(false);
 
   // editar
   async function handleEdit(grupo: GrupoWithDetails) {
