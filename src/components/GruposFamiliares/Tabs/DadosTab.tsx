@@ -30,6 +30,7 @@ export default function DadosTab({
   const [changeDate, setChangeDate] = useState(new Date().toISOString().split('T')[0]);
   const [observacao, setObservacao] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const leadershipFields: { label: string; field: LeadershipField }[] = [
     { label: 'Líder 1', field: 'lider_1_id' },
@@ -70,6 +71,11 @@ export default function DadosTab({
         changeDate,
         observacao
       );
+      
+      // Mostrar feedback de sucesso
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+      
       closeModal();
     } catch (e) {
       console.error(e);
@@ -80,6 +86,21 @@ export default function DadosTab({
 
   return (
     <div className="space-y-6">
+      {/* Toast de Sucesso */}
+      {showSuccess && (
+        <div className="fixed top-4 right-4 z-[70] animate-in slide-in-from-top">
+          <div className="bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3">
+            <div className="p-1 bg-white/20 rounded-full">
+              <Save className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-semibold">Liderança alterada com sucesso!</div>
+              <div className="text-sm text-green-100">Registro adicionado ao histórico</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Descrição */}
       <div>
         <h4 className="text-sm font-semibold text-slate-700 mb-2">Descrição</h4>
