@@ -53,7 +53,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
   const [loading, setLoading] = useState(false);
 
   // Form
-  const [showFormShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<GrupoWithDetails | null>(null);
   const [form, setForm] = useState({
     nome: '',
@@ -90,13 +90,7 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
   async function loadGrupos() {
     const { data, error } = await supabase
       .from('grupos_familiares')
-      .select(`
-        *,
-        lider_1:lider_1_id(id, nome_completo, telefone),
-        lider_2:lider_2_id(id, nome_completo, telefone),
-        co_lider_1:co_lider_1_id(id, nome_completo, telefone),
-        co_lider_2:co_lider_2_id(id, nome_completo, telefone)
-      `)
+      .select('*')
       .order('nome');
 
     if (error) {
