@@ -16,12 +16,12 @@ export default function HistoricoTab({ historico, formatDate }: HistoricoTabProp
         return <UserPlus className="w-5 h-5 text-green-600" />;
       case 'removido':
         return <UserMinus className="w-5 h-5 text-red-600" />;
-      case 'promovido':
+      case 'Promovido':
         return <TrendingUp className="w-5 h-5 text-blue-600" />;
-      case 'rebaixado':
+      case 'Rebaixado':
         return <TrendingDown className="w-5 h-5 text-orange-600" />;
-      case 'lider_alterado':
-      case 'co_lider_alterado':
+      case 'Lider alterado':
+      case 'Co lider alterado':
         return <Shield className="w-5 h-5 text-purple-600" />;
       default:
         return <AlertCircle className="w-5 h-5 text-slate-400" />;
