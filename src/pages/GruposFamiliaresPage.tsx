@@ -16,12 +16,13 @@ import {
   Eye
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import PessoaDetails from '../components/Pessoas/PessoaDetails';
 
 // GruposFamiliaresPage.tsx — versão completa e revisada
 // - Cria / edita / exclui grupos
 // - Modal de visualização do grupo com abas: Dados | Membros | Ocorrências | Histórico
 // - Adicionar / remover membros registra entradas em tabela de histórico (grupo_membros_historico)
-// - Cada membro tem botão "olho" que abre modal de Ficha da Pessoa (Dados | Histórico)
+// - Cada membro tem botão "olho" que abre a Ficha da Pessoa usando o componente PessoaDetails
 // - Ocorrências CRUD por grupo
 // Observação: ajuste nomes de tabelas/colunas no supabase se necessário
 
@@ -83,10 +84,9 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
   // histórico do grupo
   const [historicoGrupo, setHistoricoGrupo] = useState<MembroHistorico[]>([]);
 
-  // modal pessoa (ficha)
-  const [showPessoaModal, setShowPessoaModal] = useState(false);
-  const [selectedPessoa, setSelectedPessoa] = useState<Pessoa | null>(null);
-  const [personHistory, setPersonHistory] = useState<MembroHistorico[]>([]);
+  // NOVOS: estados para abrir PessoaDetails (igual PessoasPage)
+  const [viewMode, setViewMode] = useState<'list' | 'form' | 'details'>('list');
+  const [selectedPessoaId, setSelectedPessoaId] = useState<string | null>(null);
 
   useEffect(() => {
     loadAll();
@@ -343,24 +343,16 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
     }
   }
 
-  // abrir ficha da pessoa (reutiliza padrão do PessoasList)
-  async function openPessoaFicha(person: Pessoa) {
-    setSelectedPessoa(null);
-    setShowPessoaModal(true);
-    try {
-      const { data } = await supabase.from('pessoas').select('*').eq('id', person.id).single();
-      setSelectedPessoa(data || null);
-      const { data: hist } = await supabase.from('grupo_membros_historico').select('*').eq('pessoa_id', person.id).order('data', { ascending: false });
-      setPersonHistory(hist || []);
-    } catch (e) {
-      console.error(e);
-    }
+  // abrir ficha da pessoa — agora abre PessoaDetails (igual PessoasPage)
+  function openPessoaFicha(person: Pessoa) {
+    // abrimos a mesma view usada em PessoasPage
+    setSelectedPessoaId(person.id);
+    setViewMode('details');
   }
 
   function closePessoaFicha() {
-    setShowPessoaModal(false);
-    setSelectedPessoa(null);
-    setPersonHistory([]);
+    setSelectedPessoaId(null);
+    setViewMode('list');
   }
 
   // ocorrências
@@ -432,324 +424,294 @@ export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPagePro
         )}
       </div>
 
-      {/* form create/edit */}
-      {showForm && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-6">{editing ? 'Editar Grupo Familiar' : 'Novo Grupo Familiar'}</h3>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Nome *</label>
-              <input value={form.nome} onChange={e => setForm(prev => ({ ...prev, nome: e.target.value }))} className="w-full px-4 py-2 border rounded" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Descrição</label>
-              <textarea value={form.descricao} onChange={e => setForm(prev => ({ ...prev, descricao: e.target.value }))} rows={3} className="w-full px-4 py-2 border rounded" />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Líder 1</label>
-                <select value={form.lider_1_id} onChange={e => setForm(prev => ({ ...prev, lider_1_id: e.target.value }))} className="w-full px-4 py-2 border rounded">
-                  <option value="">Selecione...</option>
-                  {pessoas.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Líder 2</label>
-                <select value={form.lider_2_id} onChange={e => setForm(prev => ({ ...prev, lider_2_id: e.target.value }))} className="w-full px-4 py-2 border rounded">
-                  <option value="">Selecione...</option>
-                  {pessoas.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Co-líder 1</label>
-                <select value={form.co_lider_1_id} onChange={e => setForm(prev => ({ ...prev, co_lider_1_id: e.target.value }))} className="w-full px-4 py-2 border rounded">
-                  <option value="">Selecione...</option>
-                  {pessoas.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Co-líder 2</label>
-                <select value={form.co_lider_2_id} onChange={e => setForm(prev => ({ ...prev, co_lider_2_id: e.target.value }))} className="w-full px-4 py-2 border rounded">
-                  <option value="">Selecione...</option>
-                  {pessoas.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-slate-700">Membros</label>
-                <button type="button" onClick={() => { setShowGroupView(true); setViewingGroup(editing ? editing : ({ id: 'tmp', nome: form.nome } as any)); setActiveTab('membros'); setMemberSearch(''); }} className="px-3 py-1 bg-blue-600 text-white rounded">Abrir Membros</button>
-              </div>
-
-              <div className="space-y-2">
-                {form.membros_ids.map(id => {
-                  const p = pessoas.find(x => x.id === id);
-                  return (
-                    <div key={id} className="flex items-center justify-between border p-2 rounded">
-                      <div className="flex items-center gap-3">
-                        <UsersRound className="w-5 h-5 text-orange-600" />
-                        <div>
-                          <div className="text-sm font-medium">{p?.nome_completo}</div>
-                          <div className="text-xs text-slate-500">{(p as any)?.telefone || ''}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => setForm(prev => ({ ...prev, membros_ids: prev.membros_ids.filter(x => x !== id) }))} className="text-sm text-red-600">Remover</button>
-                        <button type="button" onClick={() => openPessoaFicha(p as Pessoa)} className="text-sm text-slate-700">Ficha</button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {form.membros_ids.length === 0 && <div className="text-sm text-slate-500 italic">Nenhum membro adicionado</div>}
-              </div>
-            </div>
-
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">{error}</div>}
-
-            <div className="flex gap-3 justify-end">
-              <button type="button" onClick={() => { setShowForm(false); setEditing(null); setError(''); }} className="px-4 py-2 border rounded">Cancelar</button>
-              <button type="submit" disabled={loading} className="px-4 py-2 bg-orange-600 text-white rounded">{loading ? 'Salvando...' : 'Salvar'}</button>
-            </div>
-          </form>
+      {/* === PessoaDetails view (igual PessoasPage) === */}
+      {viewMode === 'details' && selectedPessoaId && (
+        <div className="p-4 bg-white rounded-xl border">
+          <button onClick={closePessoaFicha} className="mb-4 flex items-center gap-2 text-slate-600 hover:text-slate-800"><ArrowLeft className="w-4 h-4" /> Voltar</button>
+          <PessoaDetails pessoaId={selectedPessoaId} onClose={closePessoaFicha} />
         </div>
       )}
 
-      {/* listagem */}
-      {loading && !showForm ? (
-        <div className="text-center py-12">Carregando...</div>
-      ) : grupos.length === 0 && !showForm ? (
-        <div className="text-center py-12 bg-white rounded-xl border">Nenhum grupo cadastrado</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {grupos.map(grupo => (
-            <div key={grupo.id} className="bg-white border rounded-xl p-6 hover:shadow-lg transition">
-              <div className="flex items-start justify-between mb-4">
+      {/* MAIN PAGE */}
+      {viewMode !== 'details' && (
+        <>
+          {/* form create/edit */}
+          {showForm && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-6">{editing ? 'Editar Grupo Familiar' : 'Novo Grupo Familiar'}</h3>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <h3 className="font-semibold text-slate-900">{grupo.nome}</h3>
-                  <p className="text-xs text-slate-500">{grupo.membros_count || 0} membro(s)</p>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Nome *</label>
+                  <input value={form.nome} onChange={e => setForm(prev => ({ ...prev, nome: e.target.value }))} className="w-full px-4 py-2 border rounded" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleEdit(grupo)} className="p-2 rounded hover:bg-slate-50"><Edit className="w-4 h-4" /></button>
-                  <button onClick={() => handleDelete(grupo.id)} className="p-2 rounded hover:bg-red-50"><Trash2 className="w-4 h-4 text-red-600" /></button>
-                  <button onClick={() => openGroupView(grupo)} className="p-2 rounded hover:bg-slate-50"><UsersRound className="w-4 h-4" /></button>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Descrição</label>
+                  <textarea value={form.descricao} onChange={e => setForm(prev => ({ ...prev, descricao: e.target.value }))} rows={3} className="w-full px-4 py-2 border rounded" />
                 </div>
-              </div>
-              <div className="text-sm text-slate-600">{(grupo as any).descricao || ''}</div>
-            </div>
-          ))}
-        </div>
-      )}
 
-      {/* GROUP VIEW MODAL */}
-      {showGroupView && viewingGroup && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-5xl rounded-xl shadow-xl p-6 overflow-auto max-h-[90vh]">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-xl font-semibold">{viewingGroup.nome}</h3>
-                <p className="text-sm text-slate-500">ID: {viewingGroup.id}</p>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={closeGroupView} className="px-3 py-2 border rounded">Fechar</button>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <nav className="flex gap-2 border-b pb-2">
-                <button onClick={() => setActiveTab('dados')} className={`px-3 py-2 rounded ${activeTab === 'dados' ? 'bg-slate-100' : ''}`}>Dados</button>
-                <button onClick={() => setActiveTab('membros')} className={`px-3 py-2 rounded ${activeTab === 'membros' ? 'bg-slate-100' : ''}`}>Membros</button>
-                <button onClick={() => setActiveTab('ocorrencias')} className={`px-3 py-2 rounded ${activeTab === 'ocorrencias' ? 'bg-slate-100' : ''}`}>Ocorrências</button>
-                <button onClick={() => setActiveTab('historico')} className={`px-3 py-2 rounded ${activeTab === 'historico' ? 'bg-slate-100' : ''}`}>Histórico</button>
-              </nav>
-
-              <div className="mt-4">
-                {activeTab === 'dados' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-slate-600">Descrição</p>
-                      <div className="mt-2">{(viewingGroup as any).descricao || '—'}</div>
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-600">Líderes</p>
-                      <div className="mt-2 text-sm">
-                        <div>Líder 1: {pessoas.find(p => p.id === (viewingGroup as any).lider_1_id)?.nome_completo || '—'}</div>
-                        <div>Líder 2: {pessoas.find(p => p.id === (viewingGroup as any).lider_2_id)?.nome_completo || '—'}</div>
-                        <div>Co-líder 1: {pessoas.find(p => p.id === (viewingGroup as any).co_lider_1_id)?.nome_completo || '—'}</div>
-                        <div>Co-líder 2: {pessoas.find(p => p.id === (viewingGroup as any).co_lider_2_id)?.nome_completo || '—'}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'membros' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-semibold mb-2">Adicionar pessoas</h4>
-                      <div className="flex gap-2 mb-2">
-                        <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)} placeholder="Buscar por nome" className="flex-1 px-3 py-2 border rounded" />
-                        <button onClick={() => setMemberSearch('')} className="px-3 py-2 border rounded"><Search className="w-4 h-4" /></button>
-                      </div>
-
-                      <div className="max-h-64 overflow-auto border rounded p-2 space-y-2">
-                        {memberSearchResults.map(p => (
-                          <div key={p.id} className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">{p.nome_completo}</div>
-                              <div className="text-xs text-slate-500">{p.telefone}</div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button onClick={() => addMemberToGroup(p, 'membro')} className="px-2 py-1 bg-blue-600 text-white rounded">Adicionar</button>
-                              <button onClick={() => addMemberToGroup(p, 'líder')} className="px-2 py-1 border rounded">Como líder</button>
-                            </div>
-                          </div>
-                        ))}
-
-                        {memberSearchResults.length === 0 && <div className="text-sm text-slate-500">Nenhuma pessoa disponível</div>}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-semibold mb-2">Membros atuais</h4>
-                      <div className="max-h-80 overflow-auto border rounded p-2 space-y-2">
-                        {(viewingGroup.membros || []).map(m => (
-                          <div key={m.id} className="flex items-center justify-between border-b py-2">
-                            <div>
-                              <div className="font-medium">{m.nome_completo} <span className="text-xs text-slate-500">({m.papel_grupo || 'membro'})</span></div>
-                              <div className="text-xs text-slate-500">Entrada: {formatDate((m as any).data_entrada || (new Date()).toISOString())}</div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button onClick={() => openPessoaFicha(m)} title="Ver ficha" className="p-2 text-slate-600 hover:bg-slate-100 rounded"><Eye className="w-4 h-4" /></button>
-                              <button onClick={() => removeMemberFromGroup(m)} title="Remover" className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
-                            </div>
-                          </div>
-                        ))}
-
-                        {(!viewingGroup.membros || viewingGroup.membros.length === 0) && <div className="text-sm text-slate-500">Nenhum membro</div>}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'ocorrencias' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <form onSubmit={addOcorrencia} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end mb-4">
-                      <div>
-                        <label className="block text-xs text-slate-600 mb-1">Tipo *</label>
-                        <input value={ocorrenciaForm.tipo} onChange={e => setOcorrenciaForm(prev => ({ ...prev, tipo: e.target.value }))} className="w-full px-3 py-2 border rounded" placeholder="Ex: Visita" />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-600 mb-1">Data *</label>
-                        <input type="date" value={ocorrenciaForm.data} onChange={e => setOcorrenciaForm(prev => ({ ...prev, data: e.target.value }))} className="w-full px-3 py-2 border rounded" />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-600 mb-1">Membro (opcional)</label>
-                        <select value={ocorrenciaForm.pessoa_id} onChange={e => setOcorrenciaForm(prev => ({ ...prev, pessoa_id: e.target.value }))} className="w-full px-3 py-2 border rounded">
-                          <option value="">Nenhum</option>
-                          {(viewingGroup.membros || []).map(m => <option key={m.id} value={m.id}>{m.nome_completo}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-600 mb-1">Descrição</label>
-                        <div className="flex gap-2">
-                          <input value={ocorrenciaForm.descricao} onChange={e => setOcorrenciaForm(prev => ({ ...prev, descricao: e.target.value }))} className="w-full px-3 py-2 border rounded" />
-                          <button className="px-3 py-2 bg-slate-800 text-white rounded">Adicionar</button>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Líder 1</label>
+                    <select value={form.lider_1_id} onChange={e => setForm(prev => ({ ...prev, lider_1_id: e.target.value }))} className="w-full px-4 py-2 border rounded">
+                      <option value="">Selecione...</option>
+                      {pessoas.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Líder 2</label>
+                    <select value={form.lider_2_id} onChange={e => setForm(prev => ({ ...prev, lider_2_id: e.target.value }))} className="w-full px-4 py-2 border rounded">
+                      <option value="">Selecione...</option>
+                      {pessoas.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Co-líder 1</label>
+                    <select value={form.co_lider_1_id} onChange={e => setForm(prev => ({ ...prev, co_lider_1_id: e.target.value }))} className="w-full px-4 py-2 border rounded">
+                      <option value="">Selecione...</option>
+                      {pessoas.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Co-líder 2</label>
+                    <select value={form.co_lider_2_id} onChange={e => setForm(prev => ({ ...prev, co_lider_2_id: e.target.value }))} className="w-full px-4 py-2 border rounded">
+                      <option value="">Selecione...</option>
+                      {pessoas.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-slate-700">Membros</label>
+                    <button type="button" onClick={() => { setShowGroupView(true); setViewingGroup(editing ? editing : ({ id: 'tmp', nome: form.nome } as any)); setActiveTab('membros'); setMemberSearch(''); }} className="px-3 py-1 bg-blue-600 text-white rounded">Abrir Membros</button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {form.membros_ids.map(id => {
+                      const p = pessoas.find(x => x.id === id);
+                      return (
+                        <div key={id} className="flex items-center justify-between border p-2 rounded">
+                          <div className="flex items-center gap-3">
+                            <UsersRound className="w-5 h-5 text-orange-600" />
+                            <div>
+                              <div className="text-sm font-medium">{p?.nome_completo}</div>
+                              <div className="text-xs text-slate-500">{(p as any)?.telefone || ''}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => setForm(prev => ({ ...prev, membros_ids: prev.membros_ids.filter(x => x !== id) }))} className="text-sm text-red-600">Remover</button>
+                            <button type="button" onClick={() => openPessoaFicha(p as Pessoa)} className="text-sm text-slate-700">Ficha</button>
+                          </div>
                         </div>
-                      </div>
-                    </form>
+                      );
+                    })}
 
-                    <div className="space-y-2">
-                      {ocorrencias.length === 0 ? <div className="text-sm text-slate-500 italic">Sem ocorrências</div> : (
-                        ocorrencias.map(o => (
-                          <div key={o.id} className="bg-slate-50 border rounded p-3 flex items-start justify-between">
-                            <div>
-                              <div className="font-medium">{o.tipo_ocorrencia_id} <span className="text-xs text-slate-500">— {o.data_ocorrencia}</span></div>
-                              {o.pessoa_id && <div className="text-xs text-slate-600">Membro: {pessoas.find(p => p.id === o.pessoa_id)?.nome_completo}</div>}
-                              {o.descricao && <div className="text-xs text-slate-600 mt-1">{o.descricao}</div>}
-                            </div>
-                            <div className="flex gap-2">
-                              <button onClick={() => deleteOcorrencia(o.id)} className="text-red-600">Remover</button>
-                            </div>
-                          </div>
-                        ))
-                      )}
+                    {form.membros_ids.length === 0 && <div className="text-sm text-slate-500 italic">Nenhum membro adicionado</div>}
+                  </div>
+                </div>
+
+                {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">{error}</div>}
+
+                <div className="flex gap-3 justify-end">
+                  <button type="button" onClick={() => { setShowForm(false); setEditing(null); setError(''); }} className="px-4 py-2 border rounded">Cancelar</button>
+                  <button type="submit" disabled={loading} className="px-4 py-2 bg-orange-600 text-white rounded">{loading ? 'Salvando...' : 'Salvar'}</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* listagem */}
+          {loading && !showForm ? (
+            <div className="text-center py-12">Carregando...</div>
+          ) : grupos.length === 0 && !showForm ? (
+            <div className="text-center py-12 bg-white rounded-xl border">Nenhum grupo cadastrado</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {grupos.map(grupo => (
+                <div key={grupo.id} className="bg-white border rounded-xl p-6 hover:shadow-lg transition">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">{grupo.nome}</h3>
+                      <p className="text-xs text-slate-500">{grupo.membros_count || 0} membro(s)</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleEdit(grupo)} className="p-2 rounded hover:bg-slate-50"><Edit className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete(grupo.id)} className="p-2 rounded hover:bg-red-50"><Trash2 className="w-4 h-4 text-red-600" /></button>
+                      <button onClick={() => openGroupView(grupo)} className="p-2 rounded hover:bg-slate-50"><UsersRound className="w-4 h-4" /></button>
                     </div>
                   </div>
-                )}
+                  <div className="text-sm text-slate-600">{(grupo as any).descricao || ''}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
-                {activeTab === 'historico' && (
+          {/* GROUP VIEW MODAL */}
+          {showGroupView && viewingGroup && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+              <div className="bg-white w-full max-w-5xl rounded-xl shadow-xl p-6 overflow-auto max-h-[90vh]">
+                <div className="flex items-start justify-between">
                   <div>
-                    {historicoGrupo.length === 0 ? <div className="text-sm text-slate-500 italic">Sem histórico</div> : (
-                      <div className="space-y-2">
-                        {historicoGrupo.map(h => (
-                          <div key={h.id} className="flex items-start gap-3 p-2 border rounded">
-                            <div className="text-xs text-slate-500 w-36">{formatDate(h.data)}</div>
-                            <div>
-                              <div className="text-sm"><strong>{h.acao}</strong> — {pessoas.find(p => p.id === h.pessoa_id)?.nome_completo || 'Pessoa'}</div>
-                              {h.papel && <div className="text-xs text-slate-500">Papel: {h.papel}</div>}
-                              {h.nota && <div className="text-xs text-slate-500">{h.nota}</div>}
-                            </div>
+                    <h3 className="text-xl font-semibold">{viewingGroup.nome}</h3>
+                    <p className="text-sm text-slate-500">ID: {viewingGroup.id}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={closeGroupView} className="px-3 py-2 border rounded">Fechar</button>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <nav className="flex gap-2 border-b pb-2">
+                    <button onClick={() => setActiveTab('dados')} className={`px-3 py-2 rounded ${activeTab === 'dados' ? 'bg-slate-100' : ''}`}>Dados</button>
+                    <button onClick={() => setActiveTab('membros')} className={`px-3 py-2 rounded ${activeTab === 'membros' ? 'bg-slate-100' : ''}`}>Membros</button>
+                    <button onClick={() => setActiveTab('ocorrencias')} className={`px-3 py-2 rounded ${activeTab === 'ocorrencias' ? 'bg-slate-100' : ''}`}>Ocorrências</button>
+                    <button onClick={() => setActiveTab('historico')} className={`px-3 py-2 rounded ${activeTab === 'historico' ? 'bg-slate-100' : ''}`}>Histórico</button>
+                  </nav>
+
+                  <div className="mt-4">
+                    {activeTab === 'dados' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-slate-600">Descrição</p>
+                          <div className="mt-2">{(viewingGroup as any).descricao || '—'}</div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600">Líderes</p>
+                          <div className="mt-2 text-sm">
+                            <div>Líder 1: {pessoas.find(p => p.id === (viewingGroup as any).lider_1_id)?.nome_completo || '—'}</div>
+                            <div>Líder 2: {pessoas.find(p => p.id === (viewingGroup as any).lider_2_id)?.nome_completo || '—'}</div>
+                            <div>Co-líder 1: {pessoas.find(p => p.id === (viewingGroup as any).co_lider_1_id)?.nome_completo || '—'}</div>
+                            <div>Co-líder 2: {pessoas.find(p => p.id === (viewingGroup as any).co_lider_2_id)?.nome_completo || '—'}</div>
                           </div>
-                        ))}
+                        </div>
                       </div>
                     )}
-                  </div>
-                )}
 
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+                    {activeTab === 'membros' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="font-semibold mb-2">Adicionar pessoas</h4>
+                          <div className="flex gap-2 mb-2">
+                            <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)} placeholder="Buscar por nome" className="flex-1 px-3 py-2 border rounded" />
+                            <button onClick={() => setMemberSearch('')} className="px-3 py-2 border rounded"><Search className="w-4 h-4" /></button>
+                          </div>
 
-      {/* PESSOA FICHA MODAL */}
-      {showPessoaModal && selectedPessoa && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-2xl rounded-xl shadow-lg p-4 overflow-auto max-h-[90vh]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Ficha: {selectedPessoa.nome_completo}</h3>
-              <div className="flex gap-2">
-                <button onClick={closePessoaFicha} className="px-3 py-2 border rounded">Fechar</button>
-              </div>
-            </div>
+                          <div className="max-h-64 overflow-auto border rounded p-2 space-y-2">
+                            {memberSearchResults.map(p => (
+                              <div key={p.id} className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium">{p.nome_completo}</div>
+                                  <div className="text-xs text-slate-500">{p.telefone}</div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button onClick={() => addMemberToGroup(p, 'membro')} className="px-2 py-1 bg-blue-600 text-white rounded">Adicionar</button>
+                                  <button onClick={() => addMemberToGroup(p, 'líder')} className="px-2 py-1 border rounded">Como líder</button>
+                                </div>
+                              </div>
+                            ))}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-semibold">Dados</h4>
-                <div className="mt-2 space-y-2 text-sm">
-                  <div><strong>Nome:</strong> {selectedPessoa.nome_completo}</div>
-                  <div><strong>Telefone:</strong> {selectedPessoa.telefone || '—'}</div>
-                  <div><strong>Email:</strong> {(selectedPessoa as any).email || '—'}</div>
-                  <div><strong>Data Nasc.:</strong> {(selectedPessoa as any).data_nascimento || '—'}</div>
-                  <div><strong>Grupo familiar:</strong> {selectedPessoa.grupo_familiar_id || '—'}</div>
-                  <div><strong>Papel:</strong> {selectedPessoa.papel_grupo || '—'}</div>
-                </div>
-              </div>
+                            {memberSearchResults.length === 0 && <div className="text-sm text-slate-500">Nenhuma pessoa disponível</div>}
+                          </div>
+                        </div>
 
-              <div>
-                <h4 className="font-semibold">Histórico</h4>
-                <div className="mt-2 max-h-64 overflow-auto border rounded p-2 space-y-2">
-                  {personHistory.length === 0 ? <div className="text-sm text-slate-500">Nenhum histórico encontrado</div> : (
-                    personHistory.map(ph => (
-                      <div key={ph.id} className="p-2 border rounded bg-slate-50">
-                        <div className="text-xs text-slate-500">{formatDate(ph.data)}</div>
-                        <div className="text-sm"><strong>{ph.acao}</strong> — {ph.papel || ''}</div>
-                        {ph.nota && <div className="text-xs text-slate-500">{ph.nota}</div>}
+                        <div>
+                          <h4 className="font-semibold mb-2">Membros atuais</h4>
+                          <div className="max-h-80 overflow-auto border rounded p-2 space-y-2">
+                            {(viewingGroup.membros || []).map(m => (
+                              <div key={m.id} className="flex items-center justify-between border-b py-2">
+                                <div>
+                                  <div className="font-medium">{m.nome_completo} <span className="text-xs text-slate-500">({m.papel_grupo || 'membro'})</span></div>
+                                  <div className="text-xs text-slate-500">Entrada: {formatDate((m as any).data_entrada || (new Date()).toISOString())}</div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button onClick={() => openPessoaFicha(m)} title="Ver ficha" className="p-2 text-slate-600 hover:bg-slate-100 rounded"><Eye className="w-4 h-4" /></button>
+                                  <button onClick={() => removeMemberFromGroup(m)} title="Remover" className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                              </div>
+                            ))}
+
+                            {(!viewingGroup.membros || viewingGroup.membros.length === 0) && <div className="text-sm text-slate-500">Nenhum membro</div>}
+                          </div>
+                        </div>
                       </div>
-                    ))
-                  )}
+                    )}
+
+                    {activeTab === 'ocorrencias' && (
+                      <div>
+                        <form onSubmit={addOcorrencia} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end mb-4">
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Tipo *</label>
+                            <input value={ocorrenciaForm.tipo} onChange={e => setOcorrenciaForm(prev => ({ ...prev, tipo: e.target.value }))} className="w-full px-3 py-2 border rounded" placeholder="Ex: Visita" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Data *</label>
+                            <input type="date" value={ocorrenciaForm.data} onChange={e => setOcorrenciaForm(prev => ({ ...prev, data: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Membro (opcional)</label>
+                            <select value={ocorrenciaForm.pessoa_id} onChange={e => setOcorrenciaForm(prev => ({ ...prev, pessoa_id: e.target.value }))} className="w-full px-3 py-2 border rounded">
+                              <option value="">Nenhum</option>
+                              {(viewingGroup.membros || []).map(m => <option key={m.id} value={m.id}>{m.nome_completo}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Descrição</label>
+                            <div className="flex gap-2">
+                              <input value={ocorrenciaForm.descricao} onChange={e => setOcorrenciaForm(prev => ({ ...prev, descricao: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+                              <button className="px-3 py-2 bg-slate-800 text-white rounded">Adicionar</button>
+                            </div>
+                          </div>
+                        </form>
+
+                        <div className="space-y-2">
+                          {ocorrencias.length === 0 ? <div className="text-sm text-slate-500 italic">Sem ocorrências</div> : (
+                            ocorrencias.map(o => (
+                              <div key={o.id} className="bg-slate-50 border rounded p-3 flex items-start justify-between">
+                                <div>
+                                  <div className="font-medium">{o.tipo_ocorrencia_id} <span className="text-xs text-slate-500">— {o.data_ocorrencia}</span></div>
+                                  {o.pessoa_id && <div className="text-xs text-slate-600">Membro: {pessoas.find(p => p.id === o.pessoa_id)?.nome_completo}</div>}
+                                  {o.descricao && <div className="text-xs text-slate-600 mt-1">{o.descricao}</div>}
+                                </div>
+                                <div className="flex gap-2">
+                                  <button onClick={() => deleteOcorrencia(o.id)} className="text-red-600">Remover</button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTab === 'historico' && (
+                      <div>
+                        {historicoGrupo.length === 0 ? <div className="text-sm text-slate-500 italic">Sem histórico</div> : (
+                          <div className="space-y-2">
+                            {historicoGrupo.map(h => (
+                              <div key={h.id} className="flex items-start gap-3 p-2 border rounded">
+                                <div className="text-xs text-slate-500 w-36">{formatDate(h.data)}</div>
+                                <div>
+                                  <div className="text-sm"><strong>{h.acao}</strong> — {pessoas.find(p => p.id === h.pessoa_id)?.nome_completo || 'Pessoa'}</div>
+                                  {h.papel && <div className="text-xs text-slate-500">Papel: {h.papel}</div>}
+                                  {h.nota && <div className="text-xs text-slate-500">{h.nota}</div>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
                 </div>
               </div>
             </div>
+          )}
 
-          </div>
-        </div>
+        </>
       )}
 
     </div>
