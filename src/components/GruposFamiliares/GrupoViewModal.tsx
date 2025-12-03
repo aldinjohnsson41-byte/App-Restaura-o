@@ -1,331 +1,264 @@
-// components/GruposFamiliares/GrupoViewModal.tsx
+// pages/GruposFamiliaresPage.tsx
 import React, { useState, useEffect } from 'react';
-import { X, Edit } from 'lucide-react';
-import { supabase, Pessoa } from '../../lib/supabase';
-import { GrupoWithCounts, TabType, LeadershipField, MembroHistorico, Ocorrencia, OcorrenciaForm } from '../../types/grupos';
-import DadosTab from './Tabs/DadosTab';
-import MembrosTab from './Tabs/MembrosTab';
-import OcorrenciasTab from './Tabs/OcorrenciasTab';
-import HistoricoTab from './Tabs/HistoricoTab';
+import { ArrowLeft, Plus } from 'lucide-react';
+import { supabase, Pessoa } from '../lib/supabase';
+import { GrupoWithCounts, FormState } from '../types/grupos';
+import { useGruposFamiliares } from '../hooks/useGruposFamiliares';
+import GruposList from '../components/GruposFamiliares/GruposList';
+import GrupoForm from '../components/GruposFamiliares/GrupoForm';
+import GrupoViewModal from '../components/GruposFamiliares/GrupoViewModal';
+import PessoaDetails from '../components/Pessoas/PessoaDetails';
 
-interface GrupoViewModalProps {
-  grupo: GrupoWithCounts | null;
-  pessoas: Pessoa[];
-  onClose: () => void;
-  onEdit: () => void;
-  onReload: () => void;
-  onViewPessoa: (pessoa: Pessoa) => void;
+interface GruposFamiliaresPageProps {
+  onBack: () => void;
 }
 
-export default function GrupoViewModal({
-  grupo,
-  pessoas,
-  onClose,
-  onEdit,
-  onReload,
-  onViewPessoa
-}: GrupoViewModalProps) {
-  
-  const [activeTab, setActiveTab] = useState<TabType>('dados');
-  const [membros, setMembros] = useState<Pessoa[]>([]);
-  const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
-  const [historico, setHistorico] = useState<MembroHistorico[]>([]);
-  const [loading, setLoading] = useState(false);
+export default function GruposFamiliaresPage({ onBack }: GruposFamiliaresPageProps) {
+  const {
+    grupos,
+    pessoas,
+    loading,
+    error,
+    setError,
+    loadAll,
+    createGrupo,
+    updateGrupo,
+    deleteGrupo
+  } = useGruposFamiliares();
 
-  // Carregar dados quando o modal abre
+  // Form states
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<GrupoWithCounts | null>(null);
+  const [form, setForm] = useState<FormState>({
+    nome: '',
+    descricao: '',
+    lider_1_id: '',
+    lider_2_id: '',
+    co_lider_1_id: '',
+    co_lider_2_id: '',
+    membros_ids: []
+  });
+
+  // View modal states
+  const [showGroupView, setShowGroupView] = useState(false);
+  const [viewingGroup, setViewingGroup] = useState<GrupoWithCounts | null>(null);
+
+  // Pessoa details states
+  const [selectedPessoaId, setSelectedPessoaId] = useState<string | null>(null);
+  const [personViewOpen, setPersonViewOpen] = useState(false);
+
+  // Load data on mount
   useEffect(() => {
-    if (grupo?.id) {
-      loadGrupoData();
-    }
-  }, [grupo?.id]);
+    loadAll();
+  }, [loadAll]);
 
-  const loadGrupoData = async () => {
-    if (!grupo?.id) return;
+  // --- Form handlers ---
+  const handleNew = () => {
+    setEditing(null);
+    setForm({
+      nome: '',
+      descricao: '',
+      lider_1_id: '',
+      lider_2_id: '',
+      co_lider_1_id: '',
+      co_lider_2_id: '',
+      membros_ids: []
+    });
+    setShowForm(true);
+    setError('');
+  };
+
+  const handleEdit = async (grupo: GrupoWithCounts) => {
+    setEditing(grupo);
     
     const { data: membrosData } = await supabase
       .from('pessoas')
-      .select('*')
+      .select('id')
       .eq('grupo_familiar_id', grupo.id)
       .order('nome_completo');
     
-    const { data: ocorrsData } = await supabase
-      .from('ocorrencias')
-      .select('*')
-      .eq('grupo_id', grupo.id)
-      .order('data_ocorrencia', { ascending: false });
-    
-    const { data: histData } = await supabase
-      .from('grupo_membros_historico')
-      .select('*')
-      .eq('grupo_id', grupo.id)
-      .order('data', { ascending: false });
+    const membros_ids = (membrosData || []).map((m: any) => m.id);
 
-    setMembros(membrosData || []);
-    setOcorrencias(ocorrsData || []);
-    setHistorico(histData || []);
+    setForm({
+      nome: grupo.nome || '',
+      descricao: (grupo as any).descricao || '',
+      lider_1_id: (grupo as any).lider_1_id || '',
+      lider_2_id: (grupo as any).lider_2_id || '',
+      co_lider_1_id: (grupo as any).co_lider_1_id || '',
+      co_lider_2_id: (grupo as any).co_lider_2_id || '',
+      membros_ids
+    });
+    setShowForm(true);
   };
 
-  const handleAddMember = async (pessoa: Pessoa, papel: string) => {
-    if (!grupo?.id) return;
-    setLoading(true);
-    try {
-      await supabase.from('pessoas').update({
-        grupo_familiar_id: grupo.id,
-        papel_grupo: papel
-      }).eq('id', pessoa.id);
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setError('');
 
-      const now = new Date().toISOString();
-      await supabase.from('grupo_membros_historico').insert({
-        grupo_id: grupo.id,
-        pessoa_id: pessoa.id,
-        acao: 'adicionado',
-        papel,
-        data: now,
-        nota: `Membro ${pessoa.nome_completo} adicionado`
-      });
-
-      await loadGrupoData();
-      onReload();
-    } catch (e) {
-      console.error(e);
-      alert('Erro ao adicionar membro');
-    } finally {
-      setLoading(false);
+    if (!form.nome.trim()) {
+      setError('Nome do grupo é obrigatório');
+      return;
     }
-  };
 
-  const handleRemoveMember = async (pessoa: Pessoa) => {
-    if (!grupo?.id) return;
-    setLoading(true);
-    try {
-      await supabase.from('pessoas').update({
-        grupo_familiar_id: null,
-        papel_grupo: null
-      }).eq('id', pessoa.id);
+    const leaderIds = [
+      form.lider_1_id,
+      form.lider_2_id,
+      form.co_lider_1_id,
+      form.co_lider_2_id
+    ].filter(Boolean);
 
-      const now = new Date().toISOString();
-      await supabase.from('grupo_membros_historico').insert({
-        grupo_id: grupo.id,
-        pessoa_id: pessoa.id,
-        acao: 'removido',
-        papel: null,
-        data: now,
-        nota: 'Removido via modal'
-      });
-
-      await loadGrupoData();
-      onReload();
-    } catch (e) {
-      console.error(e);
-      alert('Erro ao remover membro');
-    } finally {
-      setLoading(false);
+    if (new Set(leaderIds).size !== leaderIds.length) {
+      setError('Uma mesma pessoa não pode ocupar mais de um papel de liderança');
+      return;
     }
-  };
 
-  const handleChangeLeadership = async (field: LeadershipField, pessoaId: string) => {
-    if (!grupo?.id) return;
-    setLoading(true);
     try {
-      const prevValue = (grupo as any)[field];
-      
-      await supabase.from('grupos_familiares').update({
-        [field]: pessoaId || null
-      }).eq('id', grupo.id);
-
-      if (pessoaId) {
-        const papel = field.startsWith('co_') ? 'co-líder' : 'líder';
-        await supabase.from('pessoas').update({
-          grupo_familiar_id: grupo.id,
-          papel_grupo: papel
-        }).eq('id', pessoaId);
+      if (editing) {
+        await updateGrupo(editing.id!, form);
+      } else {
+        await createGrupo(form);
       }
+      setShowForm(false);
+      setEditing(null);
+    } catch (err) {
+      // Error is handled in hook
+    }
+  };
 
-      if (prevValue && prevValue !== pessoaId) {
-        const { data: stillMember } = await supabase
-          .from('pessoas')
-          .select('id')
-          .eq('id', prevValue)
-          .eq('grupo_familiar_id', grupo.id)
-          .single();
-        
-        const papelNovo = stillMember ? 'membro' : null;
-        await supabase.from('pessoas').update({
-          papel_grupo: papelNovo
-        }).eq('id', prevValue);
-      }
+  const handleCancel = () => {
+    setShowForm(false);
+    setEditing(null);
+    setError('');
+  };
 
-      const now = new Date().toISOString();
-      await supabase.from('grupo_membros_historico').insert({
-        grupo_id: grupo.id,
-        pessoa_id: pessoaId || null,
-        acao: field.startsWith('co_') ? 'co_lider_alterado' : 'lider_alterado',
-        papel: field.startsWith('co_') ? 'co-líder' : 'líder',
-        data: now,
-        nota: `Campo ${field} atualizado`
-      });
-
-      await loadGrupoData();
-      onReload();
+  const handleDelete = async (grupoId: string) => {
+    try {
+      await deleteGrupo(grupoId);
     } catch (e) {
-      console.error(e);
-      alert('Erro ao alterar liderança');
-    } finally {
-      setLoading(false);
+      alert('Erro ao excluir grupo');
     }
   };
 
-  const handleAddOcorrencia = async (form: OcorrenciaForm) => {
-    if (!grupo?.id) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('ocorrencias').insert({
-        tipo_ocorrencia_id: form.tipo,
-        pessoa_id: form.pessoa_id || null,
-        data_ocorrencia: form.data,
-        descricao: form.descricao || null,
-        grupo_id: grupo.id
-      }).select().single();
+  // --- View modal handlers ---
+  const openGroupView = (grupo: GrupoWithCounts) => {
+    setViewingGroup(grupo);
+    setShowGroupView(true);
+  };
 
-      if (error) throw error;
-      
-      setOcorrencias(prev => [data, ...prev]);
-    } catch (e: any) {
-      console.error(e);
-      alert(e.message || 'Erro ao adicionar ocorrência');
-    } finally {
-      setLoading(false);
+  const closeGroupView = () => {
+    setShowGroupView(false);
+    setViewingGroup(null);
+  };
+
+  const handleEditFromView = () => {
+    if (viewingGroup) {
+      closeGroupView();
+      handleEdit(viewingGroup);
     }
   };
 
-  const handleDeleteOcorrencia = async (id: string) => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.from('ocorrencias').delete().eq('id', id);
-      if (error) throw error;
-      
-      setOcorrencias(prev => prev.filter(o => o.id !== id));
-    } catch (e) {
-      console.error(e);
-      alert('Erro ao remover ocorrência');
-    } finally {
-      setLoading(false);
-    }
+  // --- Pessoa handlers ---
+  const openPessoaFicha = (pessoa: Pessoa) => {
+    setSelectedPessoaId(pessoa.id);
+    setPersonViewOpen(true);
   };
 
-  const formatDate = (iso?: string | null) => {
-    if (!iso) return '—';
-    try {
-      return new Date(iso).toLocaleString();
-    } catch {
-      return iso;
-    }
+  const closePessoaFicha = () => {
+    setSelectedPessoaId(null);
+    setPersonViewOpen(false);
   };
-
-  const pessoaNomeById = (id?: string | null) => {
-    if (!id) return '—';
-    return pessoas.find(p => p.id === id)?.nome_completo || '—';
-  };
-
-  if (!grupo) return null;
-
-  const tabs: { id: TabType; label: string }[] = [
-    { id: 'dados', label: 'Dados' },
-    { id: 'membros', label: 'Membros' },
-    { id: 'ocorrencias', label: 'Ocorrências' },
-    { id: 'historico', label: 'Histórico' }
-  ];
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white w-full max-w-6xl rounded-xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="p-6 border-b border-slate-200">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-2xl font-bold text-slate-900">{grupo.nome}</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                {grupo.membros_count || 0} membro(s)
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={onEdit}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2"
-              >
-                <Edit className="w-4 h-4" />
-                Editar
-              </button>
-              <button
-                onClick={onClose}
-                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={onBack}
+          className="p-2 hover:bg-slate-100 rounded-lg transition"
+        >
+          <ArrowLeft className="w-5 h-5 text-slate-700" />
+        </button>
+        <div className="flex-1">
+          <h2 className="text-2xl font-bold text-slate-900">Grupos Familiares</h2>
+          <p className="text-slate-600 text-sm">
+            Gerencie células, líderes, membros e ocorrências
+          </p>
         </div>
-
-        {/* Tabs */}
-        <div className="border-b border-slate-200 px-6">
-          <nav className="flex gap-1 -mb-px">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
-                  activeTab === tab.id
-                    ? 'border-orange-600 text-orange-600'
-                    : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
-          {activeTab === 'dados' && (
-            <DadosTab
-              grupo={grupo}
-              membros={membros}
-              onChangeLeadership={handleChangeLeadership}
-              pessoaNomeById={pessoaNomeById}
-            />
-          )}
-
-          {activeTab === 'membros' && (
-            <MembrosTab
-              membros={membros}
-              todasPessoas={pessoas}
-              grupoId={grupo.id!}
-              onAddMember={handleAddMember}
-              onRemoveMember={handleRemoveMember}
-              onViewPessoa={onViewPessoa}
-              formatDate={formatDate}
-            />
-          )}
-
-          {activeTab === 'ocorrencias' && (
-            <OcorrenciasTab
-              ocorrencias={ocorrencias}
-              membros={membros}
-              pessoas={pessoas}
-              onAdd={handleAddOcorrencia}
-              onDelete={handleDeleteOcorrencia}
-            />
-          )}
-
-          {activeTab === 'historico' && (
-            <HistoricoTab
-              historico={historico}
-              formatDate={formatDate}
-            />
-          )}
-        </div>
+        {!showForm && !personViewOpen && (
+          <button
+            onClick={handleNew}
+            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Grupo
+          </button>
+        )}
       </div>
+
+      {/* Pessoa Details (inline) */}
+      {personViewOpen && selectedPessoaId && (
+        <div className="p-4 bg-white rounded-xl border">
+          <div className="mb-4">
+            <button
+              onClick={closePessoaFicha}
+              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Voltar
+            </button>
+          </div>
+          <PessoaDetails pessoaId={selectedPessoaId} onClose={closePessoaFicha} />
+        </div>
+      )}
+
+      {/* Main Content */}
+      {!personViewOpen && (
+        <>
+          {/* Form */}
+          {showForm && (
+            <GrupoForm
+              editing={editing}
+              form={form}
+              setForm={setForm}
+              pessoas={pessoas}
+              loading={loading}
+              error={error}
+              onSubmit={handleSubmit}
+              onCancel={handleCancel}
+              onRemoveMembro={(id) => {
+                setForm(prev => ({
+                  ...prev,
+                  membros_ids: prev.membros_ids.filter(x => x !== id)
+                }));
+              }}
+              onOpenPessoaFicha={openPessoaFicha}
+            />
+          )}
+
+          {/* List */}
+          {!showForm && (
+            <GruposList
+              grupos={grupos}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onView={openGroupView}
+              loading={loading}
+            />
+          )}
+
+          {/* View Modal */}
+          {showGroupView && viewingGroup && (
+            <GrupoViewModal
+              grupo={viewingGroup}
+              pessoas={pessoas}
+              onClose={closeGroupView}
+              onEdit={handleEditFromView}
+              onReload={loadAll}
+              onViewPessoa={openPessoaFicha}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }
