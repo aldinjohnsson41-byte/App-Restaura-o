@@ -235,12 +235,12 @@ export function useGruposFamiliares() {
       }).eq('id', pessoa.id);
 
       const now = new Date().toISOString();
-      const descricao = `Membro ${pessoa.nome_completo} adicionado`;
+      const descricao = `Membro ${pessoa.nome_completo} Adicionado`;
       
       await supabase.from('grupo_membros_historico').insert({
         grupo_id: grupoId,
         pessoa_id: pessoa.id,
-        acao: 'adicionado',
+        acao: 'Adicionado',
         papel,
         data: now,
         nota: descricao
