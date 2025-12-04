@@ -79,7 +79,7 @@ export default function ReservaForm({
       });
 
       if (temSobreposicao) {
-        setError('Existe um evento confirmado neste horÃ¡rio');
+        setError('Existe um evento confirmado neste horário');
         return false;
       }
     }
@@ -97,7 +97,7 @@ export default function ReservaForm({
       });
 
       if (temSobreposicao) {
-        setError('Este espaÃ§o jÃ¡ estÃ¡ reservado neste horÃ¡rio');
+        setError('Este espaço já está reservado neste horário');
         return false;
       }
     }
@@ -110,17 +110,17 @@ export default function ReservaForm({
     setError('');
 
     if (!formData.responsavel_nome.trim()) {
-      setError('Nome do responsÃ¡vel Ã© obrigatÃ³rio');
+      setError('Nome do responsável é obrigatório');
       return;
     }
 
     if (!formData.espaco_id) {
-      setError('Selecione um espaÃ§o');
+      setError('Selecione um espaço');
       return;
     }
 
     if (formData.hora_inicio >= formData.hora_fim) {
-      setError('HorÃ¡rio de inÃ­cio deve ser menor que horÃ¡rio de fim');
+      setError('Horário de início deve ser menor que horário de fim');
       return;
     }
 
@@ -158,7 +158,7 @@ export default function ReservaForm({
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-slate-900">
-          Nova Reserva de EspaÃ§o
+          Nova Reserva de Espaço
         </h3>
         <button
           onClick={onCancelar}
@@ -179,7 +179,7 @@ export default function ReservaForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              EspaÃ§o *
+              Espaço *
             </label>
             <select
               required
@@ -190,7 +190,7 @@ export default function ReservaForm({
               }}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="">Selecione um espaÃ§o...</option>
+              <option value="">Selecione um espaço...</option>
               {espacos.map((espaco) => (
                 <option key={espaco.id} value={espaco.id}>
                   {espaco.nome} (cap. {espaco.capacidade || 'N/A'})
@@ -231,7 +231,7 @@ export default function ReservaForm({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              HorÃ¡rio de InÃ­cio *
+              Horário de Início *
             </label>
             <input
               type="time"
@@ -244,7 +244,7 @@ export default function ReservaForm({
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              HorÃ¡rio de Fim *
+              Horário de Fim *
             </label>
             <input
               type="time"
@@ -261,7 +261,7 @@ export default function ReservaForm({
             <strong>Disponibilidade:</strong>
             {disponibilidade.map((d, idx) => (
               <div key={idx}>
-                {formatarHora(d.hora_inicio)} Ã s {formatarHora(d.hora_fim)}
+                {formatarHora(d.hora_inicio)} às {formatarHora(d.hora_fim)}
               </div>
             ))}
           </div>
@@ -270,7 +270,7 @@ export default function ReservaForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Nome do ResponsÃ¡vel *
+              Nome do Responsável *
             </label>
             <input
               type="text"
@@ -278,7 +278,7 @@ export default function ReservaForm({
               value={formData.responsavel_nome}
               onChange={(e) => setFormData({ ...formData, responsavel_nome: e.target.value })}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Ex: JoÃ£o Silva"
+              placeholder="Ex: João Silva"
             />
           </div>
 
@@ -312,7 +312,7 @@ export default function ReservaForm({
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Valor da LocaÃ§Ã£o (R$)
+              Valor da Locação (R$)
             </label>
             <input
               type="number"
@@ -327,14 +327,14 @@ export default function ReservaForm({
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
-            ObservaÃ§Ãµes
+            Observações
           </label>
           <textarea
             value={formData.observacoes}
             onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
             rows={3}
             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="InformaÃ§Ãµes adicionais sobre a reserva..."
+            placeholder="Informações adicionais sobre a reserva..."
           />
         </div>
 
