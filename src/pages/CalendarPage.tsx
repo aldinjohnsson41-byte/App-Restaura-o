@@ -42,31 +42,56 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
 
       console.log('📄 Carregando dados do calendário...'); 
 
-      const [eventosRes, reservasRes, feriadosRes] = await Promise.all([
-        // ✅ CORREÇÃO: Incluir participantes na query
-        supabase
-          .from('eventos_agenda')
-          .select(`
-            *,
-            espaco:espaco_id(*),
-            participantes:evento_participantes(
+      // ✅ TENTATIVA 1: Com participantes
+      let eventosRes = await supabase
+        .from('eventos_agenda')
+        .select(`
+          *,
+          espaco:espaco_id(*),
+          participantes:evento_participantes(
+            id,
+            pessoa_id,
+            confirmacao_presenca,
+            data_confirmacao,
+            notificacao_enviada,
+            email_enviado_para,
+            created_at,
+            pessoa:pessoa_id(
               id,
-              pessoa_id,
-              confirmacao_presenca,
-              data_confirmacao,
-              notificacao_enviada,
-              email_enviado_para,
-              created_at,
-              pessoa:pessoa_id(
-                id,
-                nome_completo,
-                email,
-                telefone,
-                whatsapp
-              )
+              nome_completo,
+              email,
+              telefone,
+              whatsapp
             )
-          `)
-          .order('data_evento'),
+          )
+        `)
+        .order('data_evento');
+
+      // ⚠️ Se der erro, tenta sem participantes
+      if (eventosRes.error) {
+        console.warn('⚠️ Erro ao carregar com participantes, tentando sem...', eventosRes.error);
+        
+        eventosRes = await supabase
+          .from('eventos_agenda')
+          .select(`*, espaco:espaco_id(*)`)
+          .order('data_evento');
+      }
+
+      console.log('📅 Response completo:', eventosRes);
+      console.log('❌ Erro na query?:', eventosRes.error);
+      console.log('📅 Eventos carregados:', eventosRes.data);
+      console.log('📊 Quantidade de eventos:', eventosRes.data?.length);
+      
+      if (eventosRes.data && eventosRes.data.length > 0) {
+        console.log('👥 Primeiro evento:', eventosRes.data[0]);
+        console.log('👥 Participantes do primeiro evento:', eventosRes.data[0]?.participantes);
+        console.log('👥 Quantidade de participantes:', eventosRes.data[0]?.participantes?.length);
+      } else {
+        console.log('⚠️ Nenhum evento encontrado!');
+      }
+
+      // Carregar reservas e feriados
+      const [reservasRes, feriadosRes] = await Promise.all([
         supabase
           .from('reservas_espacos')
           .select(`*, espaco:espaco_id(*)`)
@@ -76,22 +101,14 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
           .select('*')
           .order('data')
       ]);
-
-      console.log('📅 Response completo:', eventosRes);
-      console.log('❌ Erro na query?:', eventosRes.error);
-      console.log('📅 Eventos carregados:', eventosRes.data);
-      
-      if (eventosRes.data && eventosRes.data.length > 0) {
-        console.log('👥 Primeiro evento:', eventosRes.data[0]);
-        console.log('👥 Participantes do primeiro evento:', eventosRes.data[0]?.participantes);
-        console.log('👥 Quantidade de participantes:', eventosRes.data[0]?.participantes?.length);
-      }
       
       if (eventosRes.data) {
         setEventos(eventosRes.data as EventoAgenda[]);
       }
       if (reservasRes.data) setReservas(reservasRes.data as ReservaEspaco[]);
       if (feriadosRes.data) setFeriados(feriadosRes.data as Feriado[]);
+      
+      console.log('✅ Carregamento concluído!');
     } catch (err: any) {
       setError('Erro ao carregar dados do calendário');
       console.error('❌ Erro ao carregar dados:', err);
