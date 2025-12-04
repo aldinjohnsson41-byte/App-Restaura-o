@@ -17,7 +17,7 @@ interface CalendarDayCellProps {
   onEditarEvento: (evento: any) => void;
 }
 
-export default function CalendarDayCellMelhorado({
+export default function CalendarDayCell({
   dia,
   onSelectEvento,
   onEditarEvento,
