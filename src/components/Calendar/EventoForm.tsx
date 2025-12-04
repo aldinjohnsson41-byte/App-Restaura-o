@@ -1,43 +1,99 @@
-import { useForm } from "react-hook-form";
-import { useEffect, useState } from "react";
-import { AiOutlineSearch } from "react-icons/ai";
-import { toast } from "react-toastify";
-import { supabase } from "@/lib/supabaseClient";
+import { useState, useEffect } from 'react';
+import { X, Save, AlertCircle, Plus, Trash2, MapPin, Users, Calendar } from 'lucide-react';
 
-interface FormParticipanteProps {
-  compromissoId: string;
-  onSuccess: () => void;
-}
+// IMPORTANTE: Em produção, substitua pela importação real:
+// import { supabase } from '../../lib/supabase';
 
-const FormParticipante = ({ compromissoId, onSuccess }: FormParticipanteProps) => {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-    watch,
-  } = useForm({
-    defaultValues: {
-      nome_completo: "",
-      email: "",
-      telefone: "",
-      whatsapp: "",
-      forma_participacao: "",
-      convite_participante: "",
-      pessoas: [],
-    }
+// Em produção, importe o supabase real:
+// import { supabase } from '../../lib/supabase';
+
+// Simulação para demonstração (remova em produção)
+const supabase = {
+  from: (table) => ({
+    select: (fields) => ({
+      eq: (field, value) => ({
+        order: (orderField) => Promise.resolve({ 
+          data: table === 'espacos_fisicos' ? [
+            { id: '1', nome: 'Salão Principal', capacidade: 200, localizacao: 'Térreo' },
+            { id: '2', nome: 'Sala de Reuniões', capacidade: 30, localizacao: '1º Andar' },
+            { id: '3', nome: 'Auditório', capacidade: 150, localizacao: '2º Andar' }
+          ] : []
+        })
+      }),
+      order: (orderField) => ({
+        limit: (num) => Promise.resolve({ 
+          data: table === 'pessoas' ? [
+            { id: '1', nome_completo: 'João Silva', email: 'joao@email.com', telefone: '(11) 99999-0001' },
+            { id: '2', nome_completo: 'Maria Santos', email: 'maria@email.com', telefone: '(11) 99999-0002' },
+            { id: '3', nome_completo: 'Pedro Oliveira', email: 'pedro@email.com', telefone: '(11) 99999-0003' },
+            { id: '4', nome_completo: 'Ana Costa', email: 'ana@email.com', telefone: '(11) 99999-0004' }
+          ] : []
+        })
+      }),
+      ilike: (field, value) => ({
+        order: (orderField) => ({
+          limit: (num) => Promise.resolve({ data: [] })
+        })
+      })
+    })
+  })
+};
+
+export default function EventoFormMelhorado() {
+  const [espacos, setEspacos] = useState([]);
+  const [pessoas, setPessoas] = useState([]);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [searchPessoa, setSearchPessoa] = useState('');
+  const [showMap, setShowMap] = useState(false);
+  const [loadingPessoas, setLoadingPessoas] = useState(false);
+
+  const [formData, setFormData] = useState({
+    nome: '',
+    descricao: '',
+    data_inicio: new Date().toISOString().split('T')[0],
+    data_fim: new Date().toISOString().split('T')[0],
+    hora_inicio: '09:00',
+    hora_fim: '10:00',
+    dia_inteiro: false,
+    multiplos_dias: false,
+    local: '',
+    endereco_completo: '',
+    espaco_id: '',
+    status: 'confirmado',
+    observacoes: '',
+    participantes: []
   });
 
-  const [pessoas, setPessoas] = useState<any[]>([]);
-  const [loadingPessoas, setLoadingPessoas] = useState(false);
-  const [selectedPessoas, setSelectedPessoas] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  useEffect(() => {
+    carregarEspacos();
+  }, []);
 
-  // ---------------------------------------------------------------------------
-  // 🔍 BUSCA DE PESSOAS (CORRIGIDA — funciona como antes)
-  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (searchPessoa.length >= 2) {
+      buscarPessoas(searchPessoa);
+    } else {
+      setPessoas([]);
+    }
+  }, [searchPessoa]);
 
-  const buscarPessoas = async (termo: string) => {
+  const carregarEspacos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('espacos_fisicos')
+        .select('*')
+        .eq('ativo', true)
+        .order('nome');
+
+      if (data && !error) {
+        setEspacos(data);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar espaços:', err);
+    }
+  };
+
+  const buscarPessoas = async (termo) => {
     if (!termo || termo.length < 2) {
       setPessoas([]);
       return;
@@ -45,193 +101,502 @@ const FormParticipante = ({ compromissoId, onSuccess }: FormParticipanteProps) =
 
     try {
       setLoadingPessoas(true);
-
+      
       const { data, error } = await supabase
-        .from("pessoas")
-        .select("id, nome_completo, email, telefone, whatsapp")
+        .from('pessoas')
+        .select('id, nome_completo, email, telefone, whatsapp')
         .or(`nome_completo.ilike.%${termo}%,email.ilike.%${termo}%`)
-        .order("nome_completo")
+        .order('nome_completo')
         .limit(20);
 
-      if (error) {
-        console.error("Erro Supabase:", error);
+      if (data && !error) {
+        setPessoas(data);
+      } else {
         setPessoas([]);
-        return;
       }
-
-      setPessoas(data || []);
     } catch (err) {
-      console.error("Erro ao buscar pessoas:", err);
+      console.error('Erro ao buscar pessoas:', err);
       setPessoas([]);
     } finally {
       setLoadingPessoas(false);
     }
   };
 
-  // Atualiza resultados conforme digita
-  useEffect(() => {
-    const delay = setTimeout(() => {
-      buscarPessoas(searchTerm);
-    }, 300);
-
-    return () => clearTimeout(delay);
-  }, [searchTerm]);
-
-  // ---------------------------------------------------------------------------
-  // Seleção de pessoas
-  // ---------------------------------------------------------------------------
-
-  const adicionarPessoa = (pessoa: any) => {
-    if (selectedPessoas.find((p) => p.id === pessoa.id)) {
-      toast.warn("Essa pessoa já foi adicionada.");
+  const handleAdicionarParticipante = (pessoa) => {
+    if (formData.participantes.find(p => p.id === pessoa.id)) {
+      setError('Esta pessoa já foi adicionada');
+      setTimeout(() => setError(''), 3000);
       return;
     }
 
-    setSelectedPessoas((prev) => [...prev, pessoa]);
-    setValue("pessoas", [...selectedPessoas, pessoa]);
-    toast.success("Pessoa adicionada!");
+    setFormData({
+      ...formData,
+      participantes: [...formData.participantes, {
+        id: pessoa.id,
+        nome_completo: pessoa.nome_completo,
+        email: pessoa.email || '',
+        telefone: pessoa.telefone || pessoa.whatsapp || '',
+        confirmacao: 'pendente'
+      }]
+    });
+    setSearchPessoa(''); // Limpa o campo de busca
+    setPessoas([]); // Limpa os resultados
   };
 
-  const removerPessoa = (id: string) => {
-    const atualizadas = selectedPessoas.filter((p) => p.id !== id);
-    setSelectedPessoas(atualizadas);
-    setValue("pessoas", atualizadas);
+  const handleRemoverParticipante = (pessoaId) => {
+    setFormData({
+      ...formData,
+      participantes: formData.participantes.filter(p => p.id !== pessoaId)
+    });
   };
 
-  // ---------------------------------------------------------------------------
-  // SUBMIT
-  // ---------------------------------------------------------------------------
-
-  const onSubmit = async (data: any) => {
-    if (selectedPessoas.length === 0) {
-      toast.error("Você deve adicionar pelo menos uma pessoa ao compromisso.");
+  const handleLocalizarMapa = () => {
+    if (!formData.endereco_completo) {
+      setError('Digite o endereço completo para localizar no mapa');
+      setTimeout(() => setError(''), 3000);
       return;
     }
 
-    const payload = {
-      compromisso_id: compromissoId,
-      forma_participacao: data.forma_participacao,
-      convite_participante: data.convite_participante,
-      pessoas: selectedPessoas.map((p) => p.id),
-    };
+    const enderecoEncoded = encodeURIComponent(formData.endereco_completo);
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${enderecoEncoded}`;
+    window.open(mapUrl, '_blank');
+    setShowMap(true);
+  };
 
-    const { error } = await supabase.from("compromisso_participantes").insert([payload]);
+  const handleSubmit = async () => {
+    setError('');
 
-    if (error) {
-      console.error(error);
-      toast.error("Erro ao adicionar participantes.");
+    if (!formData.nome.trim()) {
+      setError('Nome do evento é obrigatório');
       return;
     }
 
-    toast.success("Participantes adicionados com sucesso!");
-    onSuccess();
+    if (formData.multiplos_dias && formData.data_inicio > formData.data_fim) {
+      setError('Data de início deve ser anterior à data de fim');
+      return;
+    }
+
+    if (!formData.dia_inteiro && formData.hora_inicio >= formData.hora_fim) {
+      setError('Horário de início deve ser anterior ao horário de fim');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      
+      // Preparar dados para salvar
+      const eventoData = {
+        ...formData,
+        // Se multiplos_dias for false, usa data_inicio como data_evento
+        data_evento: formData.data_inicio,
+        // Array de IDs dos participantes
+        participantes_ids: formData.participantes.map(p => p.id)
+      };
+      
+      console.log('Salvando evento:', eventoData);
+      
+      // AQUI VOCÊ DEVE CHAMAR SUA FUNÇÃO DE SALVAR:
+      // await criarEvento(eventoData, user.id);
+      
+      // Simular salvamento
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      alert('Evento salvo com sucesso!');
+      
+      // Reset form
+      setFormData({
+        nome: '',
+        descricao: '',
+        data_inicio: new Date().toISOString().split('T')[0],
+        data_fim: new Date().toISOString().split('T')[0],
+        hora_inicio: '09:00',
+        hora_fim: '10:00',
+        dia_inteiro: false,
+        multiplos_dias: false,
+        local: '',
+        endereco_completo: '',
+        espaco_id: '',
+        status: 'confirmado',
+        observacoes: '',
+        participantes: []
+      });
+      
+    } catch (err) {
+      setError(err.message || 'Erro ao salvar evento');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // ---------------------------------------------------------------------------
-  // JSX DO FORMULÁRIO (NÃO FOI ALTERADO)
-  // ---------------------------------------------------------------------------
+  const pessoasFiltradas = pessoas.filter(p => 
+    p.nome_completo.toLowerCase().includes(searchPessoa.toLowerCase()) ||
+    p.email.toLowerCase().includes(searchPessoa.toLowerCase())
+  );
+
+  const calcularDiasEvento = () => {
+    if (!formData.multiplos_dias) return 1;
+    const inicio = new Date(formData.data_inicio);
+    const fim = new Date(formData.data_fim);
+    const diffTime = Math.abs(fim - inicio);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
+  };
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold mb-4">Adicionar Participantes</h2>
+    <div className="max-w-5xl mx-auto p-6 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+      <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-bold text-slate-900">
+            Novo Evento
+          </h3>
+        </div>
 
-      {/* Campo de busca */}
-      <div className="relative">
-        <AiOutlineSearch className="absolute left-3 top-3 text-gray-500" />
-        <input
-          type="text"
-          placeholder="Buscar pessoas (nome ou e-mail)"
-          className="w-full border rounded p-2 pl-10"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      {/* Resultados */}
-      <div className="mt-2 border rounded p-2 bg-gray-50 max-h-60 overflow-y-auto">
-        {loadingPessoas ? (
-          <p>Carregando...</p>
-        ) : pessoas.length > 0 ? (
-          pessoas.map((p) => (
-            <div
-              key={p.id}
-              className="flex justify-between items-center p-2 border-b last:border-0"
-            >
-              <div>
-                <div className="font-semibold">{p.nome_completo}</div>
-                <div className="text-sm text-gray-600">{p.email}</div>
-              </div>
-              <button
-                onClick={() => adicionarPessoa(p)}
-                className="px-3 py-1 bg-blue-600 text-white rounded"
-              >
-                Adicionar
-              </button>
-            </div>
-          ))
-        ) : searchTerm.length >= 2 ? (
-          <p>Nenhuma pessoa encontrada.</p>
-        ) : (
-          <p>Digite para buscar...</p>
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3 animate-pulse">
+            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <div>{error}</div>
+          </div>
         )}
-      </div>
 
-      {/* Lista de selecionados */}
-      <div className="mt-4">
-        <h3 className="font-semibold mb-2">Selecionados:</h3>
-        {selectedPessoas.map((p) => (
-          <div
-            key={p.id}
-            className="flex justify-between items-center p-2 border rounded mb-2"
-          >
-            <span>{p.nome_completo}</span>
+        <div className="space-y-6">
+          {/* Informações Básicas */}
+          <div className="space-y-4">
+            <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-blue-600" />
+              Informações Básicas
+            </h4>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Nome do Evento *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.nome}
+                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: Culto, Reunião, Confraternização..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Descrição
+              </label>
+              <textarea
+                value={formData.descricao}
+                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                rows={3}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Detalhes do evento..."
+              />
+            </div>
+          </div>
+
+          {/* Datas e Horários */}
+          <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <h4 className="font-semibold text-slate-900">Datas e Horários</h4>
+            
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.dia_inteiro}
+                  onChange={(e) => setFormData({ ...formData, dia_inteiro: e.target.checked })}
+                  className="w-4 h-4 border border-slate-300 rounded"
+                />
+                <span className="text-sm font-medium text-slate-700">Dia inteiro</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.multiplos_dias}
+                  onChange={(e) => setFormData({ ...formData, multiplos_dias: e.target.checked })}
+                  className="w-4 h-4 border border-slate-300 rounded"
+                />
+                <span className="text-sm font-medium text-slate-700">Múltiplos dias</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Data de {formData.multiplos_dias ? 'Início' : 'Evento'} *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={formData.data_inicio}
+                  onChange={(e) => setFormData({ ...formData, data_inicio: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {formData.multiplos_dias && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Data de Término *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.data_fim}
+                    onChange={(e) => setFormData({ ...formData, data_fim: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              )}
+            </div>
+
+            {formData.multiplos_dias && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
+                <strong>Duração:</strong> {calcularDiasEvento()} dias
+              </div>
+            )}
+
+            {!formData.dia_inteiro && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Horário de Início *
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.hora_inicio}
+                    onChange={(e) => setFormData({ ...formData, hora_inicio: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Horário de Fim *
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.hora_fim}
+                    onChange={(e) => setFormData({ ...formData, hora_fim: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Local e Espaço */}
+          <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-green-600" />
+              Local e Espaço
+            </h4>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Espaço da Igreja
+              </label>
+              <select
+                value={formData.espaco_id}
+                onChange={(e) => setFormData({ ...formData, espaco_id: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Selecione um espaço...</option>
+                {espacos.map((espaco) => (
+                  <option key={espaco.id} value={espaco.id}>
+                    {espaco.nome} - Cap. {espaco.capacidade} ({espaco.localizacao})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Local (descrição)
+              </label>
+              <input
+                type="text"
+                value={formData.local}
+                onChange={(e) => setFormData({ ...formData, local: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: Salão Principal, Auditório..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Endereço Completo
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={formData.endereco_completo}
+                  onChange={(e) => setFormData({ ...formData, endereco_completo: e.target.value })}
+                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Rua, número, bairro, cidade, estado..."
+                />
+                <button
+                  type="button"
+                  onClick={handleLocalizarMapa}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition flex items-center gap-2"
+                >
+                  <MapPin className="w-4 h-4" />
+                  Ver Mapa
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Participantes */}
+          <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+              <Users className="w-5 h-5 text-purple-600" />
+              Participantes ({formData.participantes.length})
+            </h4>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Buscar e Adicionar Pessoas
+              </label>
+              <input
+                type="text"
+                value={searchPessoa}
+                onChange={(e) => setSearchPessoa(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Digite pelo menos 2 caracteres para buscar..."
+              />
+              {loadingPessoas && (
+                <p className="text-sm text-slate-500 mt-2">Buscando...</p>
+              )}
+            </div>
+
+            {searchPessoa.length >= 2 && pessoas.length > 0 && (
+              <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg bg-white shadow-lg">
+                {pessoas.map((pessoa) => {
+                  const jaAdicionado = formData.participantes.find(p => p.id === pessoa.id);
+                  return (
+                    <button
+                      key={pessoa.id}
+                      type="button"
+                      onClick={() => handleAdicionarParticipante(pessoa)}
+                      disabled={jaAdicionado}
+                      className={`w-full text-left px-4 py-3 transition border-b border-slate-200 last:border-b-0 ${
+                        jaAdicionado 
+                          ? 'bg-slate-100 cursor-not-allowed opacity-60' 
+                          : 'hover:bg-blue-50 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-slate-900">{pessoa.nome_completo}</div>
+                          <div className="text-sm text-slate-600">{pessoa.email}</div>
+                          {pessoa.telefone && (
+                            <div className="text-xs text-slate-500">{pessoa.telefone}</div>
+                          )}
+                        </div>
+                        {jaAdicionado && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                            Adicionado
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {searchPessoa.length >= 2 && !loadingPessoas && pessoas.length === 0 && (
+              <div className="p-4 text-center text-slate-500 text-sm bg-slate-50 rounded-lg border border-slate-200">
+                Nenhuma pessoa encontrada
+              </div>
+            )}
+
+            {searchPessoa.length > 0 && searchPessoa.length < 2 && (
+              <div className="p-2 text-xs text-slate-500">
+                Digite pelo menos 2 caracteres para buscar
+              </div>
+            )}
+
+            {formData.participantes.length > 0 && (
+              <div className="space-y-2">
+                <h5 className="text-sm font-medium text-slate-700">Participantes Adicionados:</h5>
+                {formData.participantes.map((participante) => (
+                  <div
+                    key={participante.id}
+                    className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200"
+                  >
+                    <div>
+                      <div className="font-medium text-slate-900">{participante.nome_completo}</div>
+                      <div className="text-sm text-slate-600">{participante.email}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoverParticipante(participante.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Status e Observações */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Status
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="confirmado">Confirmado</option>
+                <option value="pendente">Pendente</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Observações
+              </label>
+              <textarea
+                value={formData.observacoes}
+                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                rows={3}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Notas adicionais sobre o evento..."
+              />
+            </div>
+          </div>
+
+          {/* Botões */}
+          <div className="flex gap-3 justify-end pt-6 border-t border-slate-200">
             <button
-              onClick={() => removerPessoa(p.id)}
-              className="px-2 py-1 bg-red-600 text-white rounded"
+              type="button"
+              onClick={() => window.history.back()}
+              className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
             >
-              Remover
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {submitting ? 'Salvando...' : 'Salvar Evento'}
             </button>
           </div>
-        ))}
+        </div>
       </div>
-
-      {/* Formulário de participação */}
-      <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
-        <div>
-          <label>Forma de Participação</label>
-          <select
-            {...register("forma_participacao", { required: true })}
-            className="w-full border p-2 rounded"
-          >
-            <option value="">Selecione</option>
-            <option value="presencial">Presencial</option>
-            <option value="remoto">Remoto</option>
-          </select>
-          {errors.forma_participacao && (
-            <p className="text-red-600">Campo obrigatório.</p>
-          )}
-        </div>
-
-        <div>
-          <label>Convite ao Participante</label>
-          <textarea
-            {...register("convite_participante", { required: true })}
-            className="w-full border p-2 rounded"
-          />
-          {errors.convite_participante && (
-            <p className="text-red-600">Campo obrigatório.</p>
-          )}
-        </div>
-
-        <button
-          type="submit"
-          className="w-full bg-green-600 text-white py-2 rounded"
-        >
-          Salvar Participantes
-        </button>
-      </form>
     </div>
   );
-};
-
-export default FormParticipante;
+}
