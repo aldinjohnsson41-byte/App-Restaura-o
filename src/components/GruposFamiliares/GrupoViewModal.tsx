@@ -61,8 +61,9 @@ export default function GrupoViewModal({
       .eq('grupo_familiar_id', grupo.id)
       .order('nome_completo');
     
+    // Usar a nova tabela grupo_ocorrencias
     const { data: ocorrsData } = await supabase
-      .from('ocorrencias')
+      .from('grupo_ocorrencias')
       .select('*')
       .eq('grupo_id', grupo.id)
       .order('data_ocorrencia', { ascending: false });
@@ -214,13 +215,18 @@ export default function GrupoViewModal({
     if (!grupo?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('ocorrencias').insert({
-        tipo_ocorrencia_id: form.tipo,
-        pessoa_id: form.pessoa_id || null,
-        data_ocorrencia: form.data,
-        descricao: form.descricao || null,
-        grupo_id: grupo.id
-      }).select().single();
+      // Inserir na nova tabela grupo_ocorrencias
+      const { data, error } = await supabase
+        .from('grupo_ocorrencias')
+        .insert({
+          grupo_id: grupo.id,
+          tipo: form.tipo,
+          data_ocorrencia: form.data,
+          pessoa_id: form.pessoa_id || null,
+          descricao: form.descricao || null
+        })
+        .select()
+        .single();
 
       if (error) throw error;
       
@@ -236,7 +242,12 @@ export default function GrupoViewModal({
   const handleDeleteOcorrencia = async (id: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.from('ocorrencias').delete().eq('id', id);
+      // Deletar da nova tabela grupo_ocorrencias
+      const { error } = await supabase
+        .from('grupo_ocorrencias')
+        .delete()
+        .eq('id', id);
+      
       if (error) throw error;
       
       setOcorrencias(prev => prev.filter(o => o.id !== id));
