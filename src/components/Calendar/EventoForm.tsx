@@ -88,7 +88,11 @@ export default function EventoForm({
 
     try {
       setSubmitting(true);
-      await onSalvar(formData);
+      await onSalvar({
+  ...formData,
+  espaco_id: normalizeUUID(formData.espaco_id),
+  participantes_ids: undefined, // remove campo inexistente
+});
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar evento');
     } finally {
