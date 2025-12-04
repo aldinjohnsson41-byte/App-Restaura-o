@@ -15,16 +15,19 @@ export function gerarCalendarMes(
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
+  // Dias do mês anterior
   for (let i = diaSemanaInicial - 1; i >= 0; i--) {
     const data = new Date(ano, mes, -i);
     dias.push(criarDiaCalendario(data, mes, feriados, eventos, reservas));
   }
 
+  // Dias do mês atual
   for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
     const data = new Date(ano, mes, dia);
     dias.push(criarDiaCalendario(data, mes, feriados, eventos, reservas));
   }
 
+  // Dias do próximo mês para completar 42 dias (6 semanas)
   const diasRestantes = 42 - dias.length;
   for (let i = 1; i <= diasRestantes; i++) {
     const data = new Date(ano, mes + 1, i);
@@ -44,20 +47,25 @@ export function criarDiaCalendario(
   const dataString = formatarData(data);
   const ehMes = data.getMonth() === mesAtual;
 
+  // Encontrar feriado do dia
   const feriado = feriados.find(f => f.data === dataString);
+
+  // ✅ CORREÇÃO: Filtrar eventos que ocorrem neste dia
+  // Incluindo eventos de múltiplos dias
   const eventosDodia = eventos.filter(e => {
-  const inicio = new Date(e.data_evento);
-  const fim = new Date(e.data_fim || e.data_evento);
-  const atual = new Date(dataString);
+    // Normalizar datas para comparação
+    const dataEvento = new Date(e.data_evento + 'T00:00:00');
+    const dataFim = e.data_fim ? new Date(e.data_fim + 'T00:00:00') : dataEvento;
+    const dataAtual = new Date(dataString + 'T00:00:00');
 
-  inicio.setHours(0, 0, 0, 0);
-  fim.setHours(0, 0, 0, 0);
+    // ✅ Verificar se a data atual está entre o início e fim do evento
+    return dataAtual >= dataEvento && dataAtual <= dataFim;
+  });
 
-  return atual >= inicio && atual <= fim;
-});
-
+  // Filtrar reservas do dia
   const reservasDodia = reservas.filter(r => r.data_reserva === dataString);
 
+  // Verificar se é hoje
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const ehHoje = data.getTime() === hoje.getTime();
@@ -165,4 +173,21 @@ export function obterCoresPorTipoFeriado(tipo: string): string {
     default:
       return 'bg-slate-100 text-slate-900';
   }
+}
+
+// ✅ Nova função auxiliar para calcular dias entre datas
+export function calcularDiasEntreDatas(dataInicio: string, dataFim: string): number {
+  const inicio = new Date(dataInicio + 'T00:00:00');
+  const fim = new Date(dataFim + 'T00:00:00');
+  const diffTime = Math.abs(fim.getTime() - inicio.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+}
+
+// ✅ Nova função para verificar se uma data está em um intervalo
+export function dataEstaNoIntervalo(data: string, inicio: string, fim?: string): boolean {
+  const dataCheck = new Date(data + 'T00:00:00');
+  const dataInicio = new Date(inicio + 'T00:00:00');
+  const dataFim = fim ? new Date(fim + 'T00:00:00') : dataInicio;
+
+  return dataCheck >= dataInicio && dataCheck <= dataFim;
 }
