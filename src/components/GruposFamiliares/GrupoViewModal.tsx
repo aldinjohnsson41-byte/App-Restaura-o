@@ -6,7 +6,7 @@ import { GrupoWithCounts, TabType, LeadershipField, MembroHistorico, Ocorrencia,
 import DadosTab from './Tabs/DadosTab';
 import MembrosTab from './Tabs/MembrosTab';
 import OcorrenciasTab from './Tabs/OcorrenciasTab';
-import HistoricoTab from './Tabs/HistoricoTab';
+import EventosTab from './Tabs/EventosTab';
 
 interface GrupoViewModalProps {
   grupo: GrupoWithCounts | null;
@@ -30,6 +30,7 @@ export default function GrupoViewModal({
   const [membros, setMembros] = useState<Pessoa[]>([]);
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
   const [historico, setHistorico] = useState<MembroHistorico[]>([]);
+  const [eventos, setEventos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [grupoAtualizado, setGrupoAtualizado] = useState<GrupoWithCounts | null>(grupo);
 
@@ -74,9 +75,17 @@ export default function GrupoViewModal({
       .eq('grupo_id', grupo.id)
       .order('data', { ascending: false });
 
+    // Carregar eventos
+    const { data: eventosData } = await supabase
+      .from('grupo_eventos')
+      .select('*')
+      .eq('grupo_id', grupo.id)
+      .order('data_inicio', { ascending: true });
+
     setMembros(membrosData || []);
     setOcorrencias(ocorrsData || []);
     setHistorico(histData || []);
+    setEventos(eventosData || []);
   };
 
   const handleAddMember = async (pessoa: Pessoa, papel: string) => {
@@ -239,21 +248,102 @@ export default function GrupoViewModal({
     }
   };
 
-  const handleDeleteOcorrencia = async (id: string) => {
+  const handleAddEvento = async (form: any) => {
+    if (!grupo?.id) return;
     setLoading(true);
     try {
-      // Deletar da nova tabela grupo_ocorrencias
+      const dataHoraInicio = `${form.data_inicio}T${form.hora_inicio}:00`;
+      
+      const { data, error } = await supabase
+        .from('grupo_eventos')
+        .insert({
+          grupo_id: grupo.id,
+          titulo: form.titulo,
+          tipo: form.tipo,
+          descricao: form.descricao || null,
+          data_inicio: dataHoraInicio,
+          duracao_minutos: form.duracao_minutos,
+          local: form.local || null,
+          endereco: form.endereco || null,
+          eh_recorrente: form.eh_recorrente,
+          recorrencia_tipo: form.eh_recorrente ? form.recorrencia_tipo : null,
+          recorrencia_dia_semana: form.eh_recorrente ? form.recorrencia_dia_semana : null,
+          recorrencia_fim: form.eh_recorrente && form.recorrencia_fim ? form.recorrencia_fim : null,
+          max_participantes: form.max_participantes ? parseInt(form.max_participantes) : null,
+          requer_confirmacao: form.requer_confirmacao,
+          responsavel_id: form.responsavel_id || null,
+          cor: form.cor
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setEventos(prev => [...prev, data].sort((a, b) => 
+        new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime()
+      ));
+    } catch (e: any) {
+      console.error(e);
+      alert(e.message || 'Erro ao adicionar evento');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateEvento = async (id: string, form: any) => {
+    if (!grupo?.id) return;
+    setLoading(true);
+    try {
+      const dataHoraInicio = `${form.data_inicio}T${form.hora_inicio}:00`;
+      
+      const { data, error } = await supabase
+        .from('grupo_eventos')
+        .update({
+          titulo: form.titulo,
+          tipo: form.tipo,
+          descricao: form.descricao || null,
+          data_inicio: dataHoraInicio,
+          duracao_minutos: form.duracao_minutos,
+          local: form.local || null,
+          endereco: form.endereco || null,
+          eh_recorrente: form.eh_recorrente,
+          recorrencia_tipo: form.eh_recorrente ? form.recorrencia_tipo : null,
+          recorrencia_dia_semana: form.eh_recorrente ? form.recorrencia_dia_semana : null,
+          recorrencia_fim: form.eh_recorrente && form.recorrencia_fim ? form.recorrencia_fim : null,
+          max_participantes: form.max_participantes ? parseInt(form.max_participantes) : null,
+          requer_confirmacao: form.requer_confirmacao,
+          responsavel_id: form.responsavel_id || null,
+          cor: form.cor
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setEventos(prev => prev.map(e => e.id === id ? data : e));
+    } catch (e: any) {
+      console.error(e);
+      alert(e.message || 'Erro ao atualizar evento');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteEvento = async (id: string) => {
+    setLoading(true);
+    try {
       const { error } = await supabase
-        .from('grupo_ocorrencias')
+        .from('grupo_eventos')
         .delete()
         .eq('id', id);
       
       if (error) throw error;
       
-      setOcorrencias(prev => prev.filter(o => o.id !== id));
+      setEventos(prev => prev.filter(e => e.id !== id));
     } catch (e) {
       console.error(e);
-      alert('Erro ao remover ocorrência');
+      alert('Erro ao remover evento');
     } finally {
       setLoading(false);
     }
@@ -284,6 +374,7 @@ export default function GrupoViewModal({
   const tabs: { id: TabType; label: string }[] = [
     { id: 'dados', label: 'Dados' },
     { id: 'membros', label: 'Membros' },
+    { id: 'eventos', label: 'Eventos' },
     { id: 'ocorrencias', label: 'Ocorrências' },
     { id: 'historico', label: 'Histórico' }
   ];
@@ -359,6 +450,17 @@ export default function GrupoViewModal({
               onRemoveMember={handleRemoveMember}
               onViewPessoa={onViewPessoa}
               formatDate={formatDate}
+            />
+          )}
+
+          {activeTab === 'eventos' && (
+            <EventosTab
+              eventos={eventos}
+              membros={membros}
+              grupoId={grupo.id!}
+              onAdd={handleAddEvento}
+              onUpdate={handleUpdateEvento}
+              onDelete={handleDeleteEvento}
             />
           )}
 
