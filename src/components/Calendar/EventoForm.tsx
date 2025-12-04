@@ -5,7 +5,8 @@ import { X, Save, AlertCircle, Plus, Trash2, MapPin, Users, Calendar } from 'luc
 // import { supabase } from '../../lib/supabase';
 
 // Em produção, importe o supabase real:
-// import { supabase } from '../../lib/supabase';
+
+import { supabase } from '../../lib/supabase'
 
 // Simulação para demonstração (remova em produção)
 const supabase = {
