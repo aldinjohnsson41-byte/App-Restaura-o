@@ -1,4 +1,241 @@
-sole.error(e);
+// components/GruposFamiliares/GrupoViewModal.tsx
+import React, { useState, useEffect } from 'react';
+import { X, Edit } from 'lucide-react';
+import { supabase, Pessoa } from '../../lib/supabase';
+import {
+  GrupoWithCounts,
+  TabType,
+  LeadershipField,
+  MembroHistorico,
+  Ocorrencia,
+  OcorrenciaForm
+} from '../../types/grupos';
+import DadosTab from './Tabs/DadosTab';
+import MembrosTab from './Tabs/MembrosTab';
+import OcorrenciasTab from './Tabs/OcorrenciasTab';
+import EventosTab from './Tabs/EventosTab';
+import HistoricoTab from './Tabs/HistoricoTab';
+
+interface GrupoViewModalProps {
+  grupo: GrupoWithCounts | null;
+  pessoas: Pessoa[];
+  onClose: () => void;
+  onEdit: () => void;
+  onReload: () => void;
+  onViewPessoa: (pessoa: Pessoa) => void;
+}
+
+export default function GrupoViewModal({
+  grupo,
+  pessoas,
+  onClose,
+  onEdit,
+  onReload,
+  onViewPessoa
+}: GrupoViewModalProps) {
+  const [activeTab, setActiveTab] = useState<TabType>('dados');
+  const [membros, setMembros] = useState<Pessoa[]>([]);
+  const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
+  const [historico, setHistorico] = useState<MembroHistorico[]>([]);
+  const [eventos, setEventos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [grupoAtualizado, setGrupoAtualizado] = useState<GrupoWithCounts | null>(grupo);
+
+  // Carregar dados quando o modal abre ou quando o grupo muda
+  useEffect(() => {
+    if (grupo?.id) {
+      setGrupoAtualizado(grupo);
+      loadGrupoData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grupo?.id]);
+
+  const loadGrupoData = async () => {
+    if (!grupo?.id) return;
+    setLoading(true);
+    try {
+      // Recarregar dados do grupo
+      const { data: grupoData } = await supabase
+        .from('grupos_familiares')
+        .select('*')
+        .eq('id', grupo.id)
+        .single();
+
+      if (grupoData) {
+        setGrupoAtualizado({ ...grupoData, membros_count: grupo.membros_count });
+      }
+
+      const { data: membrosData } = await supabase
+        .from('pessoas')
+        .select('*')
+        .eq('grupo_familiar_id', grupo.id)
+        .order('nome_completo');
+
+      // Usar a nova tabela grupo_ocorrencias
+      const { data: ocorrsData } = await supabase
+        .from('grupo_ocorrencias')
+        .select('*')
+        .eq('grupo_id', grupo.id)
+        .order('data_ocorrencia', { ascending: false });
+
+      const { data: histData } = await supabase
+        .from('grupo_membros_historico')
+        .select('*')
+        .eq('grupo_id', grupo.id)
+        .order('data', { ascending: false });
+
+      // Carregar eventos
+      const { data: eventosData } = await supabase
+        .from('grupo_eventos')
+        .select('*')
+        .eq('grupo_id', grupo.id)
+        .order('data_inicio', { ascending: true });
+
+      setMembros(membrosData || []);
+      setOcorrencias(ocorrsData || []);
+      setHistorico(histData || []);
+      setEventos(eventosData || []);
+    } catch (e) {
+      console.error('Erro ao carregar dados do grupo:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddMember = async (pessoa: Pessoa, papel: string) => {
+    if (!grupo?.id) return;
+    setLoading(true);
+    try {
+      await supabase
+        .from('pessoas')
+        .update({
+          grupo_familiar_id: grupo.id,
+          papel_grupo: papel
+        })
+        .eq('id', pessoa.id);
+
+      const now = new Date().toISOString();
+      await supabase.from('grupo_membros_historico').insert({
+        grupo_id: grupo.id,
+        pessoa_id: pessoa.id,
+        acao: 'adicionado',
+        papel,
+        data: now,
+        nota: `Membro ${pessoa.nome_completo} adicionado`
+      });
+
+      await loadGrupoData();
+      onReload();
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao adicionar membro');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async (pessoa: Pessoa) => {
+    if (!grupo?.id) return;
+    setLoading(true);
+    try {
+      await supabase
+        .from('pessoas')
+        .update({
+          grupo_familiar_id: null,
+          papel_grupo: null
+        })
+        .eq('id', pessoa.id);
+
+      const now = new Date().toISOString();
+      await supabase.from('grupo_membros_historico').insert({
+        grupo_id: grupo.id,
+        pessoa_id: pessoa.id,
+        acao: 'removido',
+        papel: null,
+        data: now,
+        nota: 'Removido via modal'
+      });
+
+      await loadGrupoData();
+      onReload();
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao remover membro');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeLeadership = async (
+    field: LeadershipField,
+    pessoaId: string,
+    data: string,
+    observacao: string
+  ) => {
+    if (!grupo?.id) return;
+    setLoading(true);
+    try {
+      const prevValue = (grupo as any)[field];
+      const prevName = pessoas.find((p) => p.id === prevValue)?.nome_completo || 'Ninguém';
+      const newName = pessoaId ? (pessoas.find((p) => p.id === pessoaId)?.nome_completo || 'Desconhecido') : 'Ninguém';
+
+      // Atualizar a tabela grupos_familiares
+      const { data: updatedGrupo, error: updateError } = await supabase
+        .from('grupos_familiares')
+        .update({ [field]: pessoaId || null })
+        .eq('id', grupo.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // Se foi definida nova liderança, atualizar pessoa
+      if (pessoaId) {
+        const papel = field.startsWith('co_') ? 'co-líder' : 'líder';
+        await supabase
+          .from('pessoas')
+          .update({
+            grupo_familiar_id: grupo.id,
+            papel_grupo: papel
+          })
+          .eq('id', pessoaId);
+      }
+
+      // Se havia liderança anterior e foi alterada, rebaixar
+      if (prevValue && prevValue !== pessoaId) {
+        const { data: stillMember } = await supabase
+          .from('pessoas')
+          .select('id')
+          .eq('id', prevValue)
+          .eq('grupo_familiar_id', grupo.id)
+          .single();
+
+        const papelNovo = stillMember ? 'membro' : null;
+        await supabase.from('pessoas').update({
+          papel_grupo: papelNovo
+        }).eq('id', prevValue);
+      }
+
+      // Registrar no histórico com data e observação personalizadas
+      const labelField = field.replace('_id', '').replace('_', ' ');
+      const descricaoCompleta = `Alteração de ${labelField}: ${prevName} → ${newName}${observacao ? `. ${observacao}` : ''}`;
+
+      await supabase.from('grupo_membros_historico').insert({
+        grupo_id: grupo.id,
+        pessoa_id: pessoaId || prevValue || null,
+        acao: field.startsWith('co_') ? 'co_lider_alterado' : 'lider_alterado',
+        papel: field.startsWith('co_') ? 'co-líder' : 'líder',
+        data: data,
+        nota: descricaoCompleta
+      });
+
+      // Recarregar todos os dados do grupo
+      await loadGrupoData();
+
+      // Recarregar a lista de grupos na página principal
+      onReload();
+    } catch (e) {
+      console.error(e);
       alert('Erro ao alterar liderança');
       throw e;
     } finally {
