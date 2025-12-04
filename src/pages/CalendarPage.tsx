@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useCalendar } from '../hooks/useCalendar';
 import { EventoAgenda, ReservaEspaco, Feriado } from '../types/calendar';
-import { gerarCalendarMes, obterNomeMes } from '../utils/calendarUtils';
+import { gerarCalendarMes, obterNomeMes, adicionarMeses, formatarData } from '../utils/calendarUtils';
 import CalendarGrid from '../components/Calendar/CalendarGrid';
 import EventoForm from '../components/Calendar/EventoForm';
 import EventoDetalhes from '../components/Calendar/EventoDetalhes';
@@ -40,29 +40,12 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
       setLoading(true);
       setError('');
 
-      console.log('📄 Carregando dados do calendário...');
+      console.log('ðŸ”„ Carregando dados do calendÃ¡rio...'); // Debug
 
       const [eventosRes, reservasRes, feriadosRes] = await Promise.all([
         supabase
           .from('eventos_agenda')
-          .select(`
-            *,
-            espaco:espaco_id(*),
-            participantes:evento_participantes(
-              id,
-              pessoa_id,
-              confirmacao_presenca,
-              data_confirmacao,
-              notificacao_enviada,
-              email_enviado_para,
-              pessoa:pessoa_id(
-                id,
-                nome_completo,
-                email,
-                telefone
-              )
-            )
-          `)
+          .select(`*, espaco:espaco_id(*)`)
           .order('data_evento'),
         supabase
           .from('reservas_espacos')
@@ -74,36 +57,14 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
           .order('data')
       ]);
 
-      console.log('📅 Eventos Response:', eventosRes);
-      
-      if (eventosRes.error) {
-        console.error('❌ Erro ao carregar eventos:', eventosRes.error);
-        setError('Erro ao carregar eventos: ' + eventosRes.error.message);
-      }
-      
-      if (reservasRes.error) {
-        console.error('❌ Erro ao carregar reservas:', reservasRes.error);
-      }
-      
-      if (feriadosRes.error) {
-        console.error('❌ Erro ao carregar feriados:', feriadosRes.error);
-      }
+      console.log('ðŸ“… Eventos carregados:', eventosRes.data); // Debug
 
-      if (eventosRes.data) {
-        console.log('✅ Eventos carregados:', eventosRes.data.length);
-        setEventos(eventosRes.data as EventoAgenda[]);
-      }
-      if (reservasRes.data) {
-        console.log('✅ Reservas carregadas:', reservasRes.data.length);
-        setReservas(reservasRes.data as ReservaEspaco[]);
-      }
-      if (feriadosRes.data) {
-        console.log('✅ Feriados carregados:', feriadosRes.data.length);
-        setFeriados(feriadosRes.data as Feriado[]);
-      }
+      if (eventosRes.data) setEventos(eventosRes.data as EventoAgenda[]);
+      if (reservasRes.data) setReservas(reservasRes.data as ReservaEspaco[]);
+      if (feriadosRes.data) setFeriados(feriadosRes.data as Feriado[]);
     } catch (err: any) {
-      setError('Erro ao carregar dados do calendário');
-      console.error('❌ Erro exception:', err);
+      setError('Erro ao carregar dados do calendÃ¡rio');
+      console.error('âŒ Erro ao carregar dados:', err);
     } finally {
       setLoading(false);
     }
@@ -138,7 +99,9 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
   const handleSalvarEvento = async (eventoData: any) => {
     try {
       setError('');
+      console.log('ðŸ’¾ Salvando evento...', eventoData); // Debug
 
+      // âœ… Validar conflitos apenas se nÃ£o for dia inteiro
       if (!eventoData.dia_inteiro && eventoData.hora_inicio && eventoData.hora_fim) {
         const conflitos = await verificarConflitos(
           eventoData.espaco_id,
@@ -154,18 +117,60 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
         }
       }
 
+      // âœ… Criar ou atualizar evento
       if (editandoEvento) {
+        console.log('âœï¸ Atualizando evento existente:', editandoEvento.id);
         await atualizarEvento(editandoEvento.id, eventoData);
       } else {
-        if (!user) throw new Error('Usuário não autenticado');
+        console.log('âž• Criando novo evento');
+        if (!user) throw new Error('UsuÃ¡rio nÃ£o autenticado');
         await criarEvento(eventoData, user.id);
       }
 
+      // âœ… CORREÃ‡ÃƒO PRINCIPAL: Recarregar dados ANTES de voltar ao calendÃ¡rio
+      console.log('ðŸ”„ Recarregando dados apÃ³s salvar...');
       await carregarDados();
+
+      // âœ… Limpar estados e voltar ao calendÃ¡rio
       setViewMode('calendario');
       setEditandoEvento(null);
+      setSelectedEvento(null);
+
+      console.log('âœ… Evento salvo com sucesso!');
     } catch (err: any) {
+      console.error('âŒ Erro ao salvar evento:', err);
       setError(err.message || 'Erro ao salvar evento');
+    }
+  };
+
+  const handleExcluirEvento = async () => {
+    if (!selectedEvento) return;
+
+    if (!confirm('Deseja realmente excluir este evento?')) return;
+
+    try {
+      setError('');
+      console.log('ðŸ—‘ï¸ Excluindo evento:', selectedEvento.id);
+
+      const { error: deleteError } = await supabase
+        .from('eventos_agenda')
+        .delete()
+        .eq('id', selectedEvento.id);
+
+      if (deleteError) throw deleteError;
+
+      // âœ… Recarregar dados apÃ³s excluir
+      console.log('ðŸ”„ Recarregando dados apÃ³s excluir...');
+      await carregarDados();
+
+      // Voltar ao calendÃ¡rio
+      setViewMode('calendario');
+      setSelectedEvento(null);
+
+      console.log('âœ… Evento excluÃ­do com sucesso!');
+    } catch (err: any) {
+      console.error('âŒ Erro ao excluir evento:', err);
+      setError(err.message || 'Erro ao excluir evento');
     }
   };
 
@@ -195,7 +200,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
         </button>
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-slate-900">Agenda da Igreja</h2>
-          <p className="text-slate-600 text-sm">Gerenciar eventos e reservas de espaços</p>
+          <p className="text-slate-600 text-sm">Gerenciar eventos e reservas de espaÃ§os</p>
         </div>
         {viewMode === 'calendario' && (
           <button
@@ -247,15 +252,23 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
 
           {loading ? (
             <div className="text-center py-12">
-              <p className="text-slate-600">Carregando calendário...</p>
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="text-slate-600 mt-4">Carregando calendÃ¡rio...</p>
             </div>
           ) : (
-            <CalendarGrid
-              calendarMes={calendarMes}
-              onSelectEvento={handleVisualizarEvento}
-              onEditarEvento={handleEditarEvento}
-              onNovoEvento={handleNovoEvento}
-            />
+            <>
+              <CalendarGrid
+                calendarMes={calendarMes}
+                onSelectEvento={handleVisualizarEvento}
+                onEditarEvento={handleEditarEvento}
+                onNovoEvento={handleNovoEvento}
+              />
+              
+              {/* Contador de eventos */}
+              <div className="text-sm text-slate-600 text-center">
+                ðŸ“… Total: {eventos.length} evento(s) | ðŸ¢ {reservas.length} reserva(s)
+              </div>
+            </>
           )}
         </>
       )}
@@ -274,6 +287,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
           evento={selectedEvento}
           onEditar={() => handleEditarEvento(selectedEvento)}
           onVoltar={handleCancelar}
+          onExcluir={handleExcluirEvento}
         />
       )}
     </div>
