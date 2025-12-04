@@ -41,6 +41,8 @@ export default function EventoEdit({ evento, onClose, onSave }: EventoEditProps)
       alert("Erro ao atualizar evento");
       return;
     }
+    console.log("DATA RETORNADA:", data);
+console.log("DATA[0]:", data[0]);
 
     onSave(data[0]); // devolve apenas o evento atualizado
   };
