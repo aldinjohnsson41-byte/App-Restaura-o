@@ -105,15 +105,15 @@ export default function EventoDetalhesCompleto({
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Descrição */}
+          {/* DescriÃ§Ã£o */}
           {evento.descricao && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="font-semibold text-blue-900 mb-2">Descrição</h3>
+              <h3 className="font-semibold text-blue-900 mb-2">DescriÃ§Ã£o</h3>
               <p className="text-blue-800 whitespace-pre-wrap">{evento.descricao}</p>
             </div>
           )}
 
-          {/* Informações Principais */}
+          {/* InformaÃ§Ãµes Principais */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Data */}
             <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -128,14 +128,14 @@ export default function EventoDetalhesCompleto({
                   </p>
                   {evento.multiplos_dias && evento.data_fim && (
                     <p className="text-sm text-slate-600 mt-1">
-                      até {formatarDataBR(evento.data_fim)}
+                      atÃ© {formatarDataBR(evento.data_fim)}
                     </p>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Horário */}
+            {/* HorÃ¡rio */}
             {!evento.dia_inteiro && evento.hora_inicio && (
               <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                 <div className="flex items-start gap-3">
@@ -143,9 +143,9 @@ export default function EventoDetalhesCompleto({
                     <Clock className="w-5 h-5 text-purple-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm text-slate-600 mb-1">Horário</p>
+                    <p className="text-sm text-slate-600 mb-1">HorÃ¡rio</p>
                     <p className="font-semibold text-slate-900 text-lg">
-                      {formatarHora(evento.hora_inicio)} às {formatarHora(evento.hora_fim || '')}
+                      {formatarHora(evento.hora_inicio)} Ã s {formatarHora(evento.hora_fim || '')}
                     </p>
                     <p className="text-sm text-slate-600 mt-1">
                       {calcularDuracao(evento.hora_inicio, evento.hora_fim)}
@@ -155,7 +155,7 @@ export default function EventoDetalhesCompleto({
               </div>
             )}
 
-            {/* Espaço */}
+            {/* EspaÃ§o */}
             {evento.espaco && (
               <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                 <div className="flex items-start gap-3">
@@ -163,7 +163,7 @@ export default function EventoDetalhesCompleto({
                     <MapPin className="w-5 h-5 text-green-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm text-slate-600 mb-1">Espaço da Igreja</p>
+                    <p className="text-sm text-slate-600 mb-1">EspaÃ§o da Igreja</p>
                     <p className="font-semibold text-slate-900">{evento.espaco.nome}</p>
                     {evento.espaco.localizacao && (
                       <p className="text-sm text-slate-600">{evento.espaco.localizacao}</p>
@@ -178,7 +178,7 @@ export default function EventoDetalhesCompleto({
               </div>
             )}
 
-            {/* Endereço */}
+            {/* EndereÃ§o */}
             {evento.endereco_completo && (
               <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                 <div className="flex items-start gap-3">
@@ -186,7 +186,7 @@ export default function EventoDetalhesCompleto({
                     <MapPin className="w-5 h-5 text-orange-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm text-slate-600 mb-1">Endereço</p>
+                    <p className="text-sm text-slate-600 mb-1">EndereÃ§o</p>
                     <p className="font-medium text-slate-900">{evento.endereco_completo}</p>
                     <button
                       onClick={() => {
@@ -250,17 +250,17 @@ export default function EventoDetalhesCompleto({
             </div>
           )}
 
-          {/* Observações */}
+          {/* ObservaÃ§Ãµes */}
           {evento.observacoes && (
             <div className="border border-slate-200 rounded-lg p-4">
-              <h3 className="font-semibold text-slate-900 mb-3">Observações</h3>
+              <h3 className="font-semibold text-slate-900 mb-3">ObservaÃ§Ãµes</h3>
               <p className="text-slate-700 bg-slate-50 p-4 rounded-lg whitespace-pre-wrap">
                 {evento.observacoes}
               </p>
             </div>
           )}
 
-          {/* Informações Adicionais */}
+          {/* InformaÃ§Ãµes Adicionais */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-200">
             <div className="text-center">
               <p className="text-xs text-slate-500 mb-1">Criado em</p>
@@ -277,11 +277,11 @@ export default function EventoDetalhesCompleto({
             <div className="text-center">
               <p className="text-xs text-slate-500 mb-1">Tipo</p>
               <p className="text-sm font-medium text-slate-900">
-                {evento.dia_inteiro ? 'Dia Inteiro' : 'Horário Específico'}
+                {evento.dia_inteiro ? 'Dia Inteiro' : 'HorÃ¡rio EspecÃ­fico'}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-slate-500 mb-1">Duração</p>
+              <p className="text-xs text-slate-500 mb-1">DuraÃ§Ã£o</p>
               <p className="text-sm font-medium text-slate-900">
                 {calcularDuracaoEvento()}
               </p>
