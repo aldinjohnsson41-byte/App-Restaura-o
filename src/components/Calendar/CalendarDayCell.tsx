@@ -56,7 +56,7 @@ export default function CalendarDayCell({
     <>
       <div
         onClick={() => temEventos && setShowModal(true)}
-        className={`min-h-32 border transition-all duration-200 relative group ${
+        className={`min-h-28 border transition-all duration-200 relative group ${
           !dia.ehMes 
             ? 'bg-slate-50/50 border-slate-100' 
             : 'bg-white border-slate-200 hover:border-blue-300'
@@ -99,23 +99,22 @@ export default function CalendarDayCell({
           </div>
         )}
 
-        {/* Eventos Visíveis */}
+        {/* Indicadores de Eventos (barrinhas coloridas) */}
         {temEventos && (
           <div className="px-2 pb-2 space-y-1">
-            {eventosOrdenados.slice(0, 3).map((evento) => (
-              <div
-                key={evento.id}
-                className={`rounded-md px-2 py-1 text-[10px] font-medium leading-tight transition-all hover:shadow-md border bg-gradient-to-r ${obterCoresStatus(evento.status)} text-white cursor-pointer hover:scale-[1.02]`}
-                title={evento.nome}
-              >
-                <div className="flex items-start gap-1">
-                  {!evento.dia_inteiro && evento.hora_inicio && (
-                    <Clock className="w-2.5 h-2.5 mt-0.5 flex-shrink-0 opacity-90" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold">
-                      {evento.dia_inteiro ? '🕐' : evento.hora_inicio?.substring(0, 5)} {evento.nome}
-                    </div>
+            {eventosOrdenados.slice(0, 3).map((evento, idx) => (
+              <div key={evento.id} className="relative group/evento">
+                <div
+                  className={`h-1 rounded-full bg-gradient-to-r ${obterCoresStatus(evento.status)} transition-all duration-200 group-hover/evento:h-6 group-hover/evento:shadow-md overflow-hidden`}
+                >
+                  <div className="hidden group-hover/evento:flex items-center px-2 h-full text-white text-[10px] font-semibold whitespace-nowrap">
+                    {!evento.dia_inteiro && evento.hora_inicio && (
+                      <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {evento.dia_inteiro ? '' : `${evento.hora_inicio?.substring(0, 5)} `}
+                      {evento.nome}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -123,7 +122,7 @@ export default function CalendarDayCell({
 
             {/* Indicador de mais eventos */}
             {(dia.eventos.length + dia.reservas.length) > 3 && (
-              <div className="text-[10px] text-blue-600 font-semibold flex items-center gap-1 mt-1 hover:text-blue-700 cursor-pointer">
+              <div className="text-[10px] text-blue-600 font-semibold flex items-center gap-1 mt-1 hover:text-blue-700">
                 <span>+{(dia.eventos.length + dia.reservas.length) - 3} mais</span>
                 <ChevronRight className="w-3 h-3" />
               </div>
@@ -221,29 +220,10 @@ export default function CalendarDayCell({
 
                       {/* Informações em Grid */}
                       <div className="grid grid-cols-2 gap-3 mb-4">
-                        {/* Data - Sempre mostra */}
-                        <div className="flex items-center gap-2 text-slate-700 bg-slate-50 rounded-lg px-3 py-2">
-                          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                            <Calendar className="w-4 h-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-slate-500 font-medium">Data</div>
-                            <div className="text-sm font-semibold">
-                              {evento.multiplos_dias && evento.data_fim ? (
-                                <>
-                                  {new Date(evento.data_evento + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} até {new Date(evento.data_fim + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
-                                </>
-                              ) : (
-                                new Date(evento.data_evento + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
                         {!evento.dia_inteiro && evento.hora_inicio && (
                           <div className="flex items-center gap-2 text-slate-700 bg-slate-50 rounded-lg px-3 py-2">
-                            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                              <Clock className="w-4 h-4 text-purple-600" />
+                            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                              <Clock className="w-4 h-4 text-blue-600" />
                             </div>
                             <div>
                               <div className="text-[10px] text-slate-500 font-medium">Horário</div>
@@ -260,6 +240,20 @@ export default function CalendarDayCell({
                             <div className="min-w-0 flex-1">
                               <div className="text-[10px] text-slate-500 font-medium">Local</div>
                               <div className="text-sm font-semibold truncate">{evento.espaco.nome}</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {evento.multiplos_dias && evento.data_fim && (
+                          <div className="flex items-center gap-2 text-slate-700 bg-slate-50 rounded-lg px-3 py-2">
+                            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                              <Calendar className="w-4 h-4 text-purple-600" />
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-500 font-medium">Até</div>
+                              <div className="text-sm font-semibold">
+                                {new Date(evento.data_fim + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                              </div>
                             </div>
                           </div>
                         )}
