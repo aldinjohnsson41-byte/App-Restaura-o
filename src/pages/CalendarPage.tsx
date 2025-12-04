@@ -22,6 +22,7 @@ export default function CalendarDayCell({
   onSelectEvento,
   onEditarEvento,
 }: CalendarDayCellProps) {
+  if (!dia) return null; // <-- impede crash
   const [showModal, setShowModal] = useState(false);
 
   const eventosOrdenados = [...dia.eventos].sort((a, b) => {
