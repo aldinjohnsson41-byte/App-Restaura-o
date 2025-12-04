@@ -137,77 +137,81 @@ export default function EventoFormMelhorado() {
   };
 
   const handleSubmit = async () => {
-    setError('');
+  setError('');
 
-    if (!formData.nome.trim()) {
-      setError('Nome do evento é obrigatório');
-      return;
-    }
+  if (!formData.nome.trim()) {
+    setError('Nome do evento é obrigatório');
+    return;
+  }
 
-    if (formData.multiplos_dias && formData.data_inicio > formData.data_fim) {
-      setError('Data de início deve ser anterior à data de fim');
-      return;
-    }
+  if (formData.multiplos_dias && formData.data_inicio > formData.data_fim) {
+    setError('Data de início deve ser anterior à data de fim');
+    return;
+  }
 
-    if (!formData.dia_inteiro && formData.hora_inicio >= formData.hora_fim) {
-      setError('Horário de início deve ser anterior ao horário de fim');
-      return;
-    }
+  if (!formData.dia_inteiro && formData.hora_inicio >= formData.hora_fim) {
+    setError('Horário de início deve ser anterior ao horário de fim');
+    return;
+  }
 
-    try {
-      setSubmitting(true);
+  try {
+    setSubmitting(true);
 
-      // Preparar payload. Ajuste campos conforme sua tabela.
-      const payload: any = {
-        nome: formData.nome,
-        descricao: formData.descricao,
-        data_evento: formData.data_inicio,
-        data_inicio: formData.data_inicio,
-        data_fim: formData.data_fim,
-        hora_inicio: formData.dia_inteiro ? null : formData.hora_inicio,
-        hora_fim: formData.dia_inteiro ? null : formData.hora_fim,
-        dia_inteiro: formData.dia_inteiro,
-        multiplos_dias: formData.multiplos_dias,
-        local: formData.local,
-        endereco_completo: formData.endereco_completo,
-        espaco_id: formData.espaco_id || null,
-        status: formData.status,
-        observacoes: formData.observacoes,
-        participantes_ids: formData.participantes.map((p: any) => p.id)
-      };
+    // PREPARA PAYLOAD EXATAMENTE COMO O BANCO ESPERA
+    const payload = {
+      nome: formData.nome,
+      descricao: formData.descricao,
+      data_evento: formData.data_inicio,
+      data_fim: formData.multiplos_dias ? formData.data_fim : formData.data_inicio,
+      hora_inicio: formData.dia_inteiro ? null : formData.hora_inicio,
+      hora_fim: formData.dia_inteiro ? null : formData.hora_fim,
+      dia_inteiro: formData.dia_inteiro,
+      multiplos_dias: formData.multiplos_dias,
+      local: formData.local,
+      endereco_completo: formData.endereco_completo,
+      espaco_id: formData.espaco_id || null,
+      status: formData.status,
+      observacoes: formData.observacoes,
+      participantes_ids: formData.participantes.map((p: any) => p.id),
+      sincronizado_google: false,
+      google_calendar_id: null,
+      criado_por: null, // opcional — se quiser pode colocar user.id
+    };
 
-      // Insere na tabela 'eventos_agenda' — ajuste nome se necessário
-      const { error } = await supabase.from('eventos_agenda').insert(payload);
+    const { error } = await supabase
+      .from('eventos_agenda')
+      .insert(payload);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      // sucesso
-      alert('Evento salvo com sucesso!');
+    alert('Evento salvo com sucesso!');
 
-      // reset
-      setFormData({
-        nome: '',
-        descricao: '',
-        data_inicio: new Date().toISOString().split('T')[0],
-        data_fim: new Date().toISOString().split('T')[0],
-        hora_inicio: '09:00',
-        hora_fim: '10:00',
-        dia_inteiro: false,
-        multiplos_dias: false,
-        local: '',
-        endereco_completo: '',
-        espaco_id: '',
-        status: 'confirmado',
-        observacoes: '',
-        participantes: []
-      });
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Erro ao salvar evento');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    // Reset form
+    setFormData({
+      nome: '',
+      descricao: '',
+      data_inicio: new Date().toISOString().split('T')[0],
+      data_fim: new Date().toISOString().split('T')[0],
+      hora_inicio: '09:00',
+      hora_fim: '10:00',
+      dia_inteiro: false,
+      multiplos_dias: false,
+      local: '',
+      endereco_completo: '',
+      espaco_id: '',
+      status: 'confirmado',
+      observacoes: '',
+      participantes: []
+    });
+
+  } catch (err: any) {
+    console.error(err);
+    setError(err.message || 'Erro ao salvar evento');
+  } finally {
+    setSubmitting(false);
+  }
+};
+
 
   const pessoasFiltradas = pessoas.filter((p) =>
     (p.nome_completo || '').toLowerCase().includes(searchPessoa.toLowerCase()) ||
