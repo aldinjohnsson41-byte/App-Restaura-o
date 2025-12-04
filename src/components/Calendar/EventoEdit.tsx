@@ -42,7 +42,7 @@ export default function EventoEdit({ evento, onClose, onSave }: EventoEditProps)
       return;
     }
 
-    onSave(data); // devolve o evento atualizado
+    onSave(data[0]); // devolve apenas o evento atualizado
   };
 
   return (
