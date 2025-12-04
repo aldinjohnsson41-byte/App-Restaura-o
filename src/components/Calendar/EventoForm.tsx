@@ -175,7 +175,7 @@ export default function EventoFormMelhorado() {
           participantes_ids: formData.participantes.map((p: any) => p.id),
           sincronizado_google: false,
           google_calendar_id: null,
-          criado_por: user?.id
+          criado_por: null   // 👈 necessário se a coluna permitir NULL
         };
     
         const { error } = await supabase
