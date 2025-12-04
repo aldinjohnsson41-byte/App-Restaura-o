@@ -1,39 +1,133 @@
+// =============================================================
+// calendarUtils.ts - VersÃ£o Integrada com Melhorias
+// =============================================================
+
 import { CalendarMonth, CalendarDay, Feriado, EventoAgenda, ReservaEspaco } from '../types/calendar';
 
-export function gerarCalendarMes(
+/* ============================================================
+   1. ExpansÃ£o de eventos mÃºltiplos dias
+============================================================ */
+export function expandirEventosMultiplosDias(eventos: EventoAgenda[]): EventoAgenda[] {
+  const eventosExpandidos: EventoAgenda[] = [];
+
+  eventos.forEach(evento => {
+    if (!evento.multiplos_dias || !evento.data_fim) {
+      eventosExpandidos.push(evento);
+      return;
+    }
+
+    const dataInicio = new Date(evento.data_evento + 'T00:00:00');
+    const dataFim = new Date(evento.data_fim + 'T00:00:00');
+
+    let dataAtual = new Date(dataInicio);
+
+    while (dataAtual <= dataFim) {
+      eventosExpandidos.push({
+        ...evento,
+        data_evento: dataAtual.toISOString().split('T')[0],
+        _isPrimeiroDia: dataAtual.getTime() === dataInicio.getTime(),
+        _isUltimoDia: dataAtual.getTime() === dataFim.getTime(),
+      } as any);
+
+      dataAtual.setDate(dataAtual.getDate() + 1);
+    }
+  });
+
+  return eventosExpandidos;
+}
+
+/* ============================================================
+   2. VerificaÃ§Ã£o de conflitos de horÃ¡rio
+============================================================ */
+function converterHoraParaMinutos(hora: string): number {
+  const [h, m] = hora.split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function verificarConflitosHorario(
+  eventos: EventoAgenda[],
+  novoEvento: {
+    data_evento: string;
+    hora_inicio?: string;
+    hora_fim?: string;
+    dia_inteiro: boolean;
+    espaco_id?: string;
+    id?: string;
+  }
+): { existe: boolean; conflitos: EventoAgenda[] } {
+  
+  if (novoEvento.dia_inteiro) return { existe: false, conflitos: [] };
+  if (!novoEvento.hora_inicio || !novoEvento.hora_fim) return { existe: false, conflitos: [] };
+
+  const conflitos = eventos.filter(evento => {
+    if (novoEvento.id && evento.id === novoEvento.id) return false;
+    if (evento.data_evento !== novoEvento.data_evento) return false;
+    if (evento.dia_inteiro) return true;
+    if (novoEvento.espaco_id && evento.espaco_id !== novoEvento.espaco_id) return false;
+    if (!evento.hora_inicio || !evento.hora_fim) return false;
+
+    const nInicio = converterHoraParaMinutos(novoEvento.hora_inicio);
+    const nFim = converterHoraParaMinutos(novoEvento.hora_fim);
+    const eInicio = converterHoraParaMinutos(evento.hora_inicio);
+    const eFim = converterHoraParaMinutos(evento.hora_fim);
+
+    return !(nFim <= eInicio || nInicio >= eFim);
+  });
+
+  return { existe: conflitos.length > 0, conflitos };
+}
+
+/* ============================================================
+   3. GeraÃ§Ã£o completa do calendÃ¡rio (42 dias)
+============================================================ */
+export function gerarCalendarioComEventos(
   mes: number,
   ano: number,
-  feriados: Feriado[] = [],
-  eventos: EventoAgenda[] = [],
-  reservas: ReservaEspaco[] = []
+  eventos: EventoAgenda[],
+  reservas: ReservaEspaco[] = [],
+  feriados: Feriado[] = []
 ): CalendarMonth {
+
+  const eventosExpandidos = expandirEventosMultiplosDias(eventos);
+
   const primeiroDia = new Date(ano, mes, 1);
   const ultimoDia = new Date(ano, mes + 1, 0);
-  const diaSemanaInicial = primeiroDia.getDay();
+  const diasNoMes = ultimoDia.getDate();
+  const primeiroDiaSemana = primeiroDia.getDay();
 
-  const dias: CalendarDay[] = [];
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
-  for (let i = diaSemanaInicial - 1; i >= 0; i--) {
-    const data = new Date(ano, mes, -i);
-    dias.push(criarDiaCalendario(data, mes, feriados, eventos, reservas));
+  const dias: CalendarDay[] = [];
+
+  // Dias do mÃªs anterior
+  const diasMesAnterior = new Date(ano, mes, 0).getDate();
+  for (let i = primeiroDiaSemana - 1; i >= 0; i--) {
+    const dia = diasMesAnterior - i;
+    const data = new Date(ano, mes - 1, dia);
+
+    dias.push(criarDiaCalendario(data, mes, feriados, eventosExpandidos, reservas));
   }
 
-  for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
+  // Dias do mÃªs atual
+  for (let dia = 1; dia <= diasNoMes; dia++) {
     const data = new Date(ano, mes, dia);
-    dias.push(criarDiaCalendario(data, mes, feriados, eventos, reservas));
+    dias.push(criarDiaCalendario(data, mes, feriados, eventosExpandidos, reservas));
   }
 
+  // Dias do prÃ³ximo mÃªs para completar 42
   const diasRestantes = 42 - dias.length;
-  for (let i = 1; i <= diasRestantes; i++) {
-    const data = new Date(ano, mes + 1, i);
-    dias.push(criarDiaCalendario(data, mes, feriados, eventos, reservas));
+  for (let dia = 1; dia <= diasRestantes; dia++) {
+    const data = new Date(ano, mes + 1, dia);
+    dias.push(criarDiaCalendario(data, mes, feriados, eventosExpandidos, reservas));
   }
 
   return { mes, ano, dias };
 }
 
+/* ============================================================
+   4. Criar dia do calendÃ¡rio (usado em ambas as versÃµes)
+============================================================ */
 export function criarDiaCalendario(
   data: Date,
   mesAtual: number,
@@ -42,40 +136,30 @@ export function criarDiaCalendario(
   reservas: ReservaEspaco[] = []
 ): CalendarDay {
   const dataString = formatarData(data);
-  const ehMes = data.getMonth() === mesAtual;
-
   const feriado = feriados.find(f => f.data === dataString);
-  const eventosDodia = eventos.filter(e => e.data_evento === dataString);
-  const reservasDodia = reservas.filter(r => r.data_reserva === dataString);
-
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const ehHoje = data.getTime() === hoje.getTime();
 
   return {
     data: dataString,
     dia: data.getDate(),
     mes: data.getMonth(),
     ano: data.getFullYear(),
-    ehMes,
-    ehHoje,
+    ehMes: data.getMonth() === mesAtual,
+    ehHoje: dataString === formatarData(new Date()),
     ehFeriado: !!feriado,
     feriado,
-    eventos: eventosDodia,
-    reservas: reservasDodia,
+    eventos: eventos.filter(e => e.data_evento === dataString),
+    reservas: reservas.filter(r => r.data_reserva === dataString),
   };
 }
 
+/* ============================================================
+   5. Formatadores de data e hora
+============================================================ */
 export function formatarData(data: Date): string {
   const ano = data.getFullYear();
   const mes = String(data.getMonth() + 1).padStart(2, '0');
   const dia = String(data.getDate()).padStart(2, '0');
   return `${ano}-${mes}-${dia}`;
-}
-
-export function formatarHora(hora: string): string {
-  if (!hora) return '';
-  return hora.substring(0, 5);
 }
 
 export function formatarDataBR(dataString: string): string {
@@ -84,75 +168,50 @@ export function formatarDataBR(dataString: string): string {
   return `${dia}/${mes}/${ano}`;
 }
 
-export function formatarDataHoraBR(data: string, hora?: string): string {
-  const dataFormatada = formatarDataBR(data);
-  if (!hora) return dataFormatada;
-  return `${dataFormatada} às ${formatarHora(hora)}`;
+export function formatarHora(hora: string): string {
+  if (!hora) return '';
+  return hora.substring(0, 5);
 }
 
-export function obterNomeDiaSemana(data: Date): string {
-  const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-  return diasSemana[data.getDay()];
-}
-
+/* ============================================================
+   6. Utilidades de texto e cÃ¡lculos
+============================================================ */
 export function obterNomeMes(mes: number): string {
   const meses = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Janeiro', 'Fevereiro', 'MarÃ§o', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
   ];
   return meses[mes];
 }
 
-export function adicionarMeses(data: Date, meses: number): Date {
-  const novaData = new Date(data);
-  novaData.setMonth(novaData.getMonth() + meses);
-  return novaData;
+export function calcularDuracao(horaInicio: string, horaFim: string): string {
+  const min = converterHoraParaMinutos(horaFim) - converterHoraParaMinutos(horaInicio);
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+
+  if (h === 0) return `${m} minutos`;
+  if (m === 0) return `${h} hora${h > 1 ? 's' : ''}`;
+  return `${h}h ${m}min`;
 }
 
-export function verificarSobreposicaoHorario(
-  inicio1: string,
-  fim1: string,
-  inicio2: string,
-  fim2: string
-): boolean {
-  return !(fim1 <= inicio2 || inicio1 >= fim2);
+/* ============================================================
+   7. Cores por status e tipo de feriado
+============================================================ */
+export function obterCoresPorStatus(status: string) {
+  const cores = {
+    confirmado: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
+    pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
+    cancelado: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' }
+  };
+  return cores[status as keyof typeof cores] || cores.pendente;
 }
 
-export function calcularDuracaoEvento(hora_inicio: string, hora_fim: string): number {
-  if (!hora_inicio || !hora_fim) return 0;
-  const [horaInicio, minutoInicio] = hora_inicio.split(':').map(Number);
-  const [horaFim, minutoFim] = hora_fim.split(':').map(Number);
-
-  const totalMinutosInicio = horaInicio * 60 + minutoInicio;
-  const totalMinutosFim = horaFim * 60 + minutoFim;
-
-  return (totalMinutosFim - totalMinutosInicio) / 60;
-}
-
-export function obterCoresPorStatus(status: string): { bg: string; text: string; border: string } {
-  switch (status) {
-    case 'confirmado':
-      return { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' };
-    case 'pendente':
-      return { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' };
-    case 'cancelado':
-      return { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' };
-    default:
-      return { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' };
-  }
-}
-
-export function obterCoresPorTipoFeriado(tipo: string): string {
-  switch (tipo) {
-    case 'nacional':
-      return 'bg-yellow-100 text-yellow-900';
-    case 'estadual':
-      return 'bg-blue-100 text-blue-900';
-    case 'municipal':
-      return 'bg-green-100 text-green-900';
-    case 'religioso':
-      return 'bg-purple-100 text-purple-900';
-    default:
-      return 'bg-slate-100 text-slate-900';
-  }
+export function obterCoresPorTipoFeriado(tipo: string) {
+  const cores = {
+    nacional: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    estadual: 'bg-blue-100 text-blue-800 border-blue-300',
+    municipal: 'bg-green-100 text-green-800 border-green-300',
+    religioso: 'bg-purple-100 text-purple-800 border-purple-300'
+  };
+  return cores[tipo as keyof typeof cores] || 'bg-gray-100 text-gray-800 border-gray-300';
 }
