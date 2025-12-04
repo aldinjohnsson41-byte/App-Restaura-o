@@ -6,10 +6,6 @@ import { GrupoWithCounts, TabType, LeadershipField, MembroHistorico, Ocorrencia,
 import DadosTab from './Tabs/DadosTab';
 import MembrosTab from './Tabs/MembrosTab';
 import OcorrenciasTab from './Tabs/OcorrenciasTab';
-import DadosTab from './Tabs/DadosTab';
-import MembrosTab from './Tabs/MembrosTab';
-import OcorrenciasTab from './Tabs/OcorrenciasTab';
-import HistoricoTab from './Tabs/HistoricoTab';
 import EventosTab from './Tabs/EventosTab';
 
 interface GrupoViewModalProps {
