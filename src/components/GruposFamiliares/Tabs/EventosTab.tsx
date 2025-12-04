@@ -1,6 +1,6 @@
 // components/GruposFamiliares/Tabs/EventosTab.tsx
 import React, { useState } from 'react';
-import { Plus, Calendar, Clock, MapPin, Users, Repeat, Edit, Trash2, X, Save, Check } from 'lucide-react';
+import { Plus, Calendar, Clock, MapPin, Users, Repeat, Edit, Trash2, X, Save } from 'lucide-react';
 import { Pessoa } from '../../../lib/supabase';
 
 interface EventosTabProps {
@@ -20,7 +20,6 @@ interface GrupoEvento {
   descricao?: string | null;
   data_inicio: string;
   data_fim?: string | null;
-  duracao_minutos?: number;
   local?: string | null;
   endereco?: string | null;
   eh_recorrente: boolean;
@@ -40,7 +39,6 @@ interface EventoForm {
   descricao: string;
   data_inicio: string;
   hora_inicio: string;
-  duracao_minutos: number;
   local: string;
   endereco: string;
   eh_recorrente: boolean;
@@ -62,7 +60,6 @@ export default function EventosTab({ eventos, membros, grupoId, onAdd, onUpdate,
     descricao: '',
     data_inicio: '',
     hora_inicio: '19:00',
-    duracao_minutos: 120,
     local: '',
     endereco: '',
     eh_recorrente: false,
@@ -104,7 +101,6 @@ export default function EventosTab({ eventos, membros, grupoId, onAdd, onUpdate,
         descricao: evento.descricao || '',
         data_inicio: dataInicio.toISOString().split('T')[0],
         hora_inicio: dataInicio.toTimeString().slice(0, 5),
-        duracao_minutos: evento.duracao_minutos || 120,
         local: evento.local || '',
         endereco: evento.endereco || '',
         eh_recorrente: evento.eh_recorrente,
@@ -124,7 +120,6 @@ export default function EventosTab({ eventos, membros, grupoId, onAdd, onUpdate,
         descricao: '',
         data_inicio: '',
         hora_inicio: '19:00',
-        duracao_minutos: 120,
         local: '',
         endereco: '',
         eh_recorrente: false,
@@ -142,8 +137,15 @@ export default function EventosTab({ eventos, membros, grupoId, onAdd, onUpdate,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.titulo || !form.data_inicio) {
-      alert('Título e data são obrigatórios');
+    
+    if (!form.titulo) {
+      alert('Título é obrigatório');
+      return;
+    }
+
+    // Se não for recorrente, data é obrigatória
+    if (!form.eh_recorrente && !form.data_inicio) {
+      alert('Data é obrigatória para eventos não recorrentes');
       return;
     }
 
@@ -214,6 +216,69 @@ export default function EventosTab({ eventos, membros, grupoId, onAdd, onUpdate,
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Recorrência primeiro (para definir se data é obrigatória) */}
+            <div className="bg-slate-50 rounded-lg p-4 border">
+              <label className="flex items-center gap-2 mb-3">
+                <input
+                  type="checkbox"
+                  checked={form.eh_recorrente}
+                  onChange={(e) => setForm(prev => ({ ...prev, eh_recorrente: e.target.checked }))}
+                  className="w-4 h-4 text-indigo-600 rounded"
+                />
+                <Repeat className="w-4 h-4 text-slate-600" />
+                <span className="font-medium text-slate-700">Evento Recorrente</span>
+              </label>
+
+              {form.eh_recorrente && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Repetir
+                    </label>
+                    <select
+                      value={form.recorrencia_tipo}
+                      onChange={(e) => setForm(prev => ({ ...prev, recorrencia_tipo: e.target.value }))}
+                      className="w-full px-2 py-1.5 border rounded text-sm"
+                    >
+                      <option value="semanal">Semanalmente</option>
+                      <option value="quinzenal">Quinzenalmente</option>
+                      <option value="mensal">Mensalmente</option>
+                      <option value="anual">Anualmente</option>
+                    </select>
+                  </div>
+
+                  {(form.recorrencia_tipo === 'semanal' || form.recorrencia_tipo === 'quinzenal') && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Dia da semana
+                      </label>
+                      <select
+                        value={form.recorrencia_dia_semana}
+                        onChange={(e) => setForm(prev => ({ ...prev, recorrencia_dia_semana: parseInt(e.target.value) }))}
+                        className="w-full px-2 py-1.5 border rounded text-sm"
+                      >
+                        {diasSemana.map(dia => (
+                          <option key={dia.value} value={dia.value}>{dia.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Termina em (opcional)
+                    </label>
+                    <input
+                      type="date"
+                      value={form.recorrencia_fim}
+                      onChange={(e) => setForm(prev => ({ ...prev, recorrencia_fim: e.target.value }))}
+                      className="w-full px-2 py-1.5 border rounded text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Título */}
               <div className="md:col-span-2">
@@ -268,17 +333,20 @@ export default function EventosTab({ eventos, membros, grupoId, onAdd, onUpdate,
                 </select>
               </div>
 
-              {/* Data */}
+              {/* Data - Obrigatória apenas se NÃO for recorrente */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Data *
+                  Data {!form.eh_recorrente && '*'}
+                  {form.eh_recorrente && (
+                    <span className="text-xs text-slate-500 ml-2">(opcional para eventos recorrentes)</span>
+                  )}
                 </label>
                 <input
                   type="date"
                   value={form.data_inicio}
                   onChange={(e) => setForm(prev => ({ ...prev, data_inicio: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  required
+                  required={!form.eh_recorrente}
                 />
               </div>
 
@@ -309,16 +377,17 @@ export default function EventosTab({ eventos, membros, grupoId, onAdd, onUpdate,
                 />
               </div>
 
-              {/* Duração */}
+              {/* Máximo de Participantes */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Duração (minutos)
+                  Máx. Participantes
                 </label>
                 <input
                   type="number"
-                  value={form.duracao_minutos}
-                  onChange={(e) => setForm(prev => ({ ...prev, duracao_minutos: parseInt(e.target.value) || 120 }))}
+                  value={form.max_participantes}
+                  onChange={(e) => setForm(prev => ({ ...prev, max_participantes: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Ilimitado"
                 />
               </div>
 
@@ -334,69 +403,6 @@ export default function EventosTab({ eventos, membros, grupoId, onAdd, onUpdate,
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   placeholder="Detalhes sobre o evento..."
                 />
-              </div>
-
-              {/* Recorrência */}
-              <div className="md:col-span-2 bg-slate-50 rounded-lg p-4 border">
-                <label className="flex items-center gap-2 mb-3">
-                  <input
-                    type="checkbox"
-                    checked={form.eh_recorrente}
-                    onChange={(e) => setForm(prev => ({ ...prev, eh_recorrente: e.target.checked }))}
-                    className="w-4 h-4 text-indigo-600 rounded"
-                  />
-                  <Repeat className="w-4 h-4 text-slate-600" />
-                  <span className="font-medium text-slate-700">Evento Recorrente</span>
-                </label>
-
-                {form.eh_recorrente && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">
-                        Repetir
-                      </label>
-                      <select
-                        value={form.recorrencia_tipo}
-                        onChange={(e) => setForm(prev => ({ ...prev, recorrencia_tipo: e.target.value }))}
-                        className="w-full px-2 py-1.5 border rounded text-sm"
-                      >
-                        <option value="semanal">Semanalmente</option>
-                        <option value="quinzenal">Quinzenalmente</option>
-                        <option value="mensal">Mensalmente</option>
-                        <option value="anual">Anualmente</option>
-                      </select>
-                    </div>
-
-                    {(form.recorrencia_tipo === 'semanal' || form.recorrencia_tipo === 'quinzenal') && (
-                      <div>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">
-                          Dia da semana
-                        </label>
-                        <select
-                          value={form.recorrencia_dia_semana}
-                          onChange={(e) => setForm(prev => ({ ...prev, recorrencia_dia_semana: parseInt(e.target.value) }))}
-                          className="w-full px-2 py-1.5 border rounded text-sm"
-                        >
-                          {diasSemana.map(dia => (
-                            <option key={dia.value} value={dia.value}>{dia.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">
-                        Termina em (opcional)
-                      </label>
-                      <input
-                        type="date"
-                        value={form.recorrencia_fim}
-                        onChange={(e) => setForm(prev => ({ ...prev, recorrencia_fim: e.target.value }))}
-                        className="w-full px-2 py-1.5 border rounded text-sm"
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -456,15 +462,10 @@ export default function EventosTab({ eventos, membros, grupoId, onAdd, onUpdate,
                     </div>
 
                     <div className="space-y-1.5 text-sm text-slate-600">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        <span>{formatDateTime(evento.data_inicio)}</span>
-                      </div>
-                      
-                      {evento.duracao_minutos && (
+                      {evento.data_inicio && (
                         <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          <span>{evento.duracao_minutos} minutos</span>
+                          <Calendar className="w-4 h-4" />
+                          <span>{formatDateTime(evento.data_inicio)}</span>
                         </div>
                       )}
                       
@@ -472,6 +473,13 @@ export default function EventosTab({ eventos, membros, grupoId, onAdd, onUpdate,
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4" />
                           <span>{evento.local}</span>
+                        </div>
+                      )}
+                      
+                      {evento.max_participantes && (
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          <span>Até {evento.max_participantes} pessoas</span>
                         </div>
                       )}
                       
