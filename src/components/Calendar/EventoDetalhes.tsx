@@ -15,6 +15,17 @@ export default function EventoDetalhes({
   onExcluir
 }: EventoDetalhesProps) {
   const [showParticipantes, setShowParticipantes] = useState(false);
+
+  // 🔍 DEBUG - Verificar dados dos participantes
+  useState(() => {
+    console.log('🔍 DEBUG EventoDetalhes - Evento completo:', evento);
+    console.log('👥 DEBUG EventoDetalhes - Participantes:', evento.participantes);
+    console.log('📊 DEBUG EventoDetalhes - É array?:', Array.isArray(evento.participantes));
+    if (evento.participantes) {
+      console.log('📊 DEBUG EventoDetalhes - Quantidade:', evento.participantes.length);
+      console.log('📊 DEBUG EventoDetalhes - Primeiro participante:', evento.participantes[0]);
+    }
+  });
   
   const formatarDataBR = (data: string) => {
     if (!data) return '';
@@ -63,6 +74,8 @@ export default function EventoDetalhes({
   const confirmados = participantes.filter((p: any) => p.confirmacao_presenca === 'confirmado').length;
   const pendentes = participantes.filter((p: any) => p.confirmacao_presenca === 'pendente').length;
   const recusados = participantes.filter((p: any) => p.confirmacao_presenca === 'recusado').length;
+
+  console.log('📊 Stats - Total:', totalParticipantes, 'Confirmados:', confirmados, 'Pendentes:', pendentes);
 
   return (
     <>
