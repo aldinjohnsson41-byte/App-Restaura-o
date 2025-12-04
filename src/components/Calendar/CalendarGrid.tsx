@@ -1,5 +1,4 @@
 import { CalendarMonth, CalendarDay } from '../../types/calendar';
-import { obterNomeDiaSemana, obterCoresPorTipoFeriado } from '../../utils/calendarUtils';
 import CalendarDayCell from './CalendarDayCell';
 
 interface CalendarGridProps {
@@ -19,6 +18,7 @@ export default function CalendarGrid({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Cabeçalho com dias da semana */}
       <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200">
         {diasSemana.map((dia) => (
           <div key={dia} className="p-4 text-center font-semibold text-slate-700 text-sm">
@@ -27,18 +27,28 @@ export default function CalendarGrid({
         ))}
       </div>
 
+      {/* Grade de dias */}
       <div className="grid grid-cols-7">
-        {calendarMes.dias.map((dia, idx) => (
-          <CalendarDayCell
-            key={idx}
-            dia={dia}
-            onSelectEvento={onSelectEvento}
-            onEditarEvento={onEditarEvento}
-          />
-        ))}
+        {calendarMes.dias.map((dia, idx) =>
+          dia ? (
+            <CalendarDayCell
+              key={idx}
+              dia={dia}
+              onSelectEvento={onSelectEvento}
+              onEditarEvento={onEditarEvento}
+            />
+          ) : (
+            // fallback para dias vazios (antes/depois do mês)
+            <div
+              key={idx}
+              className="min-h-32 border bg-slate-50 border-slate-100"
+            />
+          )
+        )}
       </div>
 
-      {calendarMes.dias.some(d => d.ehFeriado) && (
+      {/* Legenda de feriados */}
+      {calendarMes.dias.some(d => d?.ehFeriado) && (
         <div className="border-t border-slate-200 p-4 bg-slate-50">
           <h4 className="font-semibold text-slate-900 mb-3 text-sm">Legenda de Feriados</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
