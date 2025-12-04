@@ -1,3 +1,7 @@
+CalendarPage.tsx
+7.33 KB •239 linhas
+•
+A formatação pode estar inconsistente com a fonte
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -59,7 +63,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
       if (reservasRes.data) setReservas(reservasRes.data as ReservaEspaco[]);
       if (feriadosRes.data) setFeriados(feriadosRes.data as Feriado[]);
     } catch (err: any) {
-      setError('Erro ao carregar dados do calendário');
+      setError('Erro ao carregar dados do calendÃ¡rio');
       console.error(err);
     } finally {
       setLoading(false);
@@ -114,7 +118,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
       if (editandoEvento) {
         await atualizarEvento(editandoEvento.id, eventoData);
       } else {
-        if (!user) throw new Error('Usuário não autenticado');
+        if (!user) throw new Error('UsuÃ¡rio nÃ£o autenticado');
         await criarEvento(eventoData, user.id);
       }
 
@@ -152,7 +156,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
         </button>
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-slate-900">Agenda da Igreja</h2>
-          <p className="text-slate-600 text-sm">Gerenciar eventos e reservas de espaços</p>
+          <p className="text-slate-600 text-sm">Gerenciar eventos e reservas de espaÃ§os</p>
         </div>
         {viewMode === 'calendario' && (
           <button
@@ -204,7 +208,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
 
           {loading ? (
             <div className="text-center py-12">
-              <p className="text-slate-600">Carregando calendário...</p>
+              <p className="text-slate-600">Carregando calendÃ¡rio...</p>
             </div>
           ) : (
             <CalendarGrid
