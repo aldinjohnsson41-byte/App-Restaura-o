@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Edit, Trash2, Users, MapPin, Clock, Calendar, CheckCircle, XCircle, AlertCircle, Mail, Phone, X } from 'lucide-react';
 
 interface EventoDetalhesProps {
@@ -17,7 +17,7 @@ export default function EventoDetalhes({
   const [showParticipantes, setShowParticipantes] = useState(false);
 
   // 🔍 DEBUG - Verificar dados dos participantes
-  useState(() => {
+  useEffect(() => {
     console.log('🔍 DEBUG EventoDetalhes - Evento completo:', evento);
     console.log('👥 DEBUG EventoDetalhes - Participantes:', evento.participantes);
     console.log('📊 DEBUG EventoDetalhes - É array?:', Array.isArray(evento.participantes));
@@ -25,7 +25,7 @@ export default function EventoDetalhes({
       console.log('📊 DEBUG EventoDetalhes - Quantidade:', evento.participantes.length);
       console.log('📊 DEBUG EventoDetalhes - Primeiro participante:', evento.participantes[0]);
     }
-  });
+  }, [evento]);
   
   const formatarDataBR = (data: string) => {
     if (!data) return '';
