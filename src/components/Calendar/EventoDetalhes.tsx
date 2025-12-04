@@ -75,6 +75,8 @@ export default function EventoDetalhes({
   const pendentes = participantes.filter((p: any) => p.confirmacao_presenca === 'pendente').length;
   const recusados = participantes.filter((p: any) => p.confirmacao_presenca === 'recusado').length;
 
+  console.log('📊 Stats - Total:', totalParticipantes, 'Confirmados:', confirmados, 'Pendentes:', pendentes);
+
   return (
     <>
       <div className="max-w-5xl mx-auto">
