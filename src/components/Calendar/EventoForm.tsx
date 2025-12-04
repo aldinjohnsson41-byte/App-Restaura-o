@@ -1,37 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Plus, Trash2, MapPin, Users, Calendar, Clock } from 'lucide-react';
-
-// Mock do supabase para demonstraÃ§Ã£o
-const mockSupabase = {
-  from: (table: string) => ({
-    select: (fields: string) => ({
-      eq: (col: string, val: any) => ({
-        order: (field: string) => ({
-          data: [
-            { id: '1', nome: 'SalÃ£o Principal', capacidade: 200, localizacao: 'TÃ©rreo' },
-            { id: '2', nome: 'AuditÃ³rio', capacidade: 100, localizacao: '1Âº Andar' }
-          ],
-          error: null
-        })
-      }),
-      or: (query: string) => ({
-        order: (field: string) => ({
-          limit: (n: number) => ({
-            data: [
-              { id: '1', nome_completo: 'JoÃ£o Silva', email: 'joao@email.com', telefone: '(11) 99999-9999' },
-              { id: '2', nome_completo: 'Maria Santos', email: 'maria@email.com', telefone: '(11) 98888-8888' }
-            ],
-            error: null
-          })
-        })
-      })
-    }),
-    insert: (data: any) => ({ data: null, error: null }),
-    update: (data: any) => ({
-      eq: (col: string, val: any) => ({ data: null, error: null })
-    })
-  })
-};
+import { supabase } from '../lib/supabase';
 
 interface EventoFormProps {
   evento?: any;
@@ -40,7 +9,7 @@ interface EventoFormProps {
   loading?: boolean;
 }
 
-export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, loading }: EventoFormProps) {
+export default function EventoForm({ evento, onSalvar, onCancelar, loading }: EventoFormProps) {
   const [espacos, setEspacos] = useState<any[]>([]);
   const [pessoas, setPessoas] = useState<any[]>([]);
   const [error, setError] = useState<string>('');
@@ -77,7 +46,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
 
   const carregarEspacos = async () => {
     try {
-      const { data, error } = await mockSupabase
+      const { data, error } = await supabase
         .from('espacos_fisicos')
         .select('*')
         .eq('ativo', true)
@@ -86,7 +55,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
       if (error) throw error;
       setEspacos(data || []);
     } catch (err) {
-      console.error('Erro ao carregar espaÃ§os:', err);
+      console.error('Erro ao carregar espaços:', err);
     }
   };
 
@@ -97,7 +66,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
     }
 
     try {
-      const { data, error } = await mockSupabase
+      const { data, error } = await supabase
         .from('pessoas')
         .select('id, nome_completo, email, telefone, whatsapp')
         .or(`nome_completo.ilike.%${termo}%,email.ilike.%${termo}%`)
@@ -114,7 +83,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
 
   const handleAdicionarParticipante = (pessoa: any) => {
     if (formData.participantes.find((p: any) => p.id === pessoa.id)) {
-      setError('Esta pessoa jÃ¡ foi adicionada');
+      setError('Esta pessoa já foi adicionada');
       setTimeout(() => setError(''), 3000);
       return;
     }
@@ -146,7 +115,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
 
   const handleLocalizarMapa = () => {
     if (!formData.endereco_completo) {
-      setError('Digite o endereÃ§o completo para localizar no mapa');
+      setError('Digite o endereço completo para localizar no mapa');
       setTimeout(() => setError(''), 3000);
       return;
     }
@@ -160,7 +129,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
     if (formData.dia_inteiro) return true;
 
     if (formData.hora_inicio >= formData.hora_fim) {
-      setError('HorÃ¡rio de inÃ­cio deve ser anterior ao horÃ¡rio de fim');
+      setError('Horário de início deve ser anterior ao horário de fim');
       return false;
     }
 
@@ -171,12 +140,12 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
     setError('');
 
     if (!formData.nome.trim()) {
-      setError('Nome do evento Ã© obrigatÃ³rio');
+      setError('Nome do evento é obrigatório');
       return;
     }
 
     if (formData.multiplos_dias && formData.data_inicio > formData.data_fim) {
-      setError('Data de inÃ­cio deve ser anterior Ã  data de fim');
+      setError('Data de início deve ser anterior à data de fim');
       return;
     }
 
@@ -204,9 +173,6 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
       };
 
       await onSalvar(payload);
-      
-      alert('Evento salvo com sucesso!');
-      onCancelar();
 
     } catch (err: any) {
       console.error(err);
@@ -252,11 +218,11 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
         )}
 
         <div className="space-y-6">
-          {/* InformaÃ§Ãµes BÃ¡sicas */}
+          {/* Informações Básicas */}
           <div className="space-y-4">
             <h4 className="font-semibold text-slate-900 flex items-center gap-2 text-lg border-b pb-2">
               <Calendar className="w-5 h-5 text-blue-600" />
-              InformaÃ§Ãµes BÃ¡sicas
+              Informações Básicas
             </h4>
 
             <div>
@@ -269,13 +235,13 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
                 value={formData.nome}
                 onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Ex: Culto, ReuniÃ£o, ConfraternizaÃ§Ã£o..."
+                placeholder="Ex: Culto, Reunião, Confraternização..."
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                DescriÃ§Ã£o
+                Descrição
               </label>
               <textarea
                 value={formData.descricao}
@@ -287,11 +253,11 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
             </div>
           </div>
 
-          {/* Datas e HorÃ¡rios */}
+          {/* Datas e Horários */}
           <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <h4 className="font-semibold text-slate-900 flex items-center gap-2">
               <Clock className="w-5 h-5 text-blue-600" />
-              Datas e HorÃ¡rios
+              Datas e Horários
             </h4>
 
             <div className="flex gap-4">
@@ -312,14 +278,14 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
                   onChange={(e) => setFormData({ ...formData, multiplos_dias: e.target.checked })}
                   className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                 />
-                <span className="text-sm font-medium text-slate-700">MÃºltiplos dias</span>
+                <span className="text-sm font-medium text-slate-700">Múltiplos dias</span>
               </label>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Data de {formData.multiplos_dias ? 'InÃ­cio' : 'Evento'} *
+                  Data de {formData.multiplos_dias ? 'Início' : 'Evento'} *
                 </label>
                 <input
                   type="date"
@@ -333,7 +299,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
               {formData.multiplos_dias && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Data de TÃ©rmino *
+                    Data de Término *
                   </label>
                   <input
                     type="date"
@@ -348,7 +314,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
 
             {formData.multiplos_dias && (
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm font-medium">
-                <strong>DuraÃ§Ã£o:</strong> {calcularDiasEvento()} dias
+                <strong>Duração:</strong> {calcularDiasEvento()} dias
               </div>
             )}
 
@@ -356,7 +322,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    HorÃ¡rio de InÃ­cio *
+                    Horário de Início *
                   </label>
                   <input
                     type="time"
@@ -369,7 +335,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    HorÃ¡rio de Fim *
+                    Horário de Fim *
                   </label>
                   <input
                     type="time"
@@ -383,23 +349,23 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
             )}
           </div>
 
-          {/* Local e EspaÃ§o */}
+          {/* Local e Espaço */}
           <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <h4 className="font-semibold text-slate-900 flex items-center gap-2">
               <MapPin className="w-5 h-5 text-green-600" />
-              Local e EspaÃ§o
+              Local e Espaço
             </h4>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                EspaÃ§o da Igreja
+                Espaço da Igreja
               </label>
               <select
                 value={formData.espaco_id}
                 onChange={(e) => setFormData({ ...formData, espaco_id: e.target.value })}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">Selecione um espaÃ§o...</option>
+                <option value="">Selecione um espaço...</option>
                 {espacos.map((espaco) => (
                   <option key={espaco.id} value={espaco.id}>
                     {espaco.nome} - Cap. {espaco.capacidade} ({espaco.localizacao})
@@ -410,7 +376,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                EndereÃ§o Completo
+                Endereço Completo
               </label>
               <div className="flex gap-2">
                 <input
@@ -418,7 +384,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
                   value={formData.endereco_completo}
                   onChange={(e) => setFormData({ ...formData, endereco_completo: e.target.value })}
                   className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Rua, nÃºmero, bairro, cidade, estado..."
+                  placeholder="Rua, número, bairro, cidade, estado..."
                 />
                 <button
                   type="button"
@@ -461,7 +427,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
                       key={pessoa.id}
                       type="button"
                       onClick={() => handleAdicionarParticipante(pessoa)}
-                      disabled={jaAdicionado}
+                      disabled={!!jaAdicionado}
                       className={`w-full text-left px-4 py-3 transition border-b border-slate-200 last:border-b-0 ${
                         jaAdicionado
                           ? 'bg-slate-100 cursor-not-allowed opacity-60'
@@ -510,7 +476,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
             )}
           </div>
 
-          {/* Status e ObservaÃ§Ãµes */}
+          {/* Status e Observações */}
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -529,7 +495,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                ObservaÃ§Ãµes
+                Observações
               </label>
               <textarea
                 value={formData.observacoes}
@@ -541,7 +507,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
             </div>
           </div>
 
-          {/* BotÃµes */}
+          {/* Botões */}
           <div className="flex gap-3 justify-end pt-6 border-t border-slate-200">
             <button
               type="button"
