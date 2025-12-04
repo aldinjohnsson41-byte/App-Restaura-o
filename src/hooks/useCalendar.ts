@@ -1,348 +1,295 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { ConflitoDiagnostico } from '../types/calendar';
+import { useAuth } from '../hooks/useAuth';
+import { useCalendar } from '../hooks/useCalendar';
+import { EventoAgenda, ReservaEspaco, Feriado } from '../types/calendar';
+import { gerarCalendarMes, obterNomeMes, adicionarMeses, formatarData } from '../utils/calendarUtils';
+import CalendarGrid from '../components/Calendar/CalendarGrid';
+import EventoForm from '../components/Calendar/EventoForm';
+import EventoDetalhes from '../components/Calendar/EventoDetalhes';
 
-export function useCalendar() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+type ViewMode = 'calendario' | 'form' | 'detalhes';
 
-  // ---------------------------------------------------
-  // 🔍 VERIFICAR CONFLITOS
-  // ---------------------------------------------------
-  const verificarConflitos = useCallback(
-    async (
-      espaco_id: string,
-      data: string,
-      hora_inicio: string,
-      hora_fim: string,
-      exclude_evento_id?: string
-    ): Promise<ConflitoDiagnostico> => {
-      try {
-        setError(null);
+interface CalendarPageProps {
+  onBack: () => void;
+}
 
-        // Buscar eventos no mesmo espaço/data
-        let query = supabase
-          .from("eventos_agenda")
-          .select("id, nome, data_evento, hora_inicio, hora_fim")
-          .eq("espaco_id", espaco_id)
-          .eq("data_evento", data)
-          .eq("status", "confirmado");
+export default function CalendarPage({ onBack }: CalendarPageProps) {
+  const { user } = useAuth();
+  const { verificarConflitos, criarEvento, atualizarEvento, loading: calendarLoading } = useCalendar();
 
-        // Excluir o próprio evento ao EDITAR
-        if (exclude_evento_id) {
-          query = query.neq("id", exclude_evento_id);
-        }
+  const [dataAtual, setDataAtual] = useState(() => new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>('calendario');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-        const { data: eventos, error: eventoErr } = await query;
+  const [eventos, setEventos] = useState<EventoAgenda[]>([]);
+  const [reservas, setReservas] = useState<ReservaEspaco[]>([]);
+  const [feriados, setFeriados] = useState<Feriado[]>([]);
 
-        if (eventoErr) throw eventoErr;
+  const [selectedEvento, setSelectedEvento] = useState<EventoAgenda | null>(null);
+  const [editandoEvento, setEditandoEvento] = useState<EventoAgenda | null>(null);
 
-        // Filtrar conflitos reais (intervalo se sobrepõe)
-        const eventosConflito = (eventos || []).filter((e: any) => {
-          if (!e.hora_inicio || !e.hora_fim) return false;
+  useEffect(() => {
+    carregarDados();
+  }, []);
 
-          return !(
-            e.hora_fim <= hora_inicio || 
-            e.hora_inicio >= hora_fim
-          ); 
-        });
-
-        // Buscar reservas no mesmo espaço/data
-        const { data: reservas, error: reservaErr } = await supabase
-          .from("reservas_espacos")
-          .select("id, responsavel_nome, data_reserva, hora_inicio, hora_fim")
-          .eq("espaco_id", espaco_id)
-          .eq("data_reserva", data)
-          .eq("status", "confirmada");
-
-        if (reservaErr) throw reservaErr;
-
-        const reservasConflito = (reservas || []).filter((r: any) => {
-          return !(r.hora_fim <= hora_inicio || r.hora_inicio >= hora_fim);
-        });
-
-        const existe = eventosConflito.length > 0 || reservasConflito.length > 0;
-
-        return {
-          existe,
-          tipo: existe ? "horario" : "nenhum",
-          mensagem: existe
-            ? "Existe um conflito de horário com outro evento ou reserva"
-            : "Sem conflitos",
-          conflitos: [
-            ...eventosConflito.map((e: any) => ({
-              evento_id: e.id,
-              nome: e.nome,
-              data: e.data_evento,
-              hora_inicio: e.hora_inicio,
-              hora_fim: e.hora_fim
-            })),
-            ...reservasConflito.map((r: any) => ({
-              reserva_id: r.id,
-              nome: r.responsavel_nome,
-              data: r.data_reserva,
-              hora_inicio: r.hora_inicio,
-              hora_fim: r.hora_fim
-            })),
-          ]
-        };
-      } catch (err: any) {
-        setError(err.message);
-        return {
-          existe: false,
-          tipo: "nenhum",
-          mensagem: "Erro ao verificar conflitos",
-          conflitos: []
-        };
-      }
-    },
-    []
-  );
-
-  // ---------------------------------------------------
-  // 🟩 CRIAR EVENTO
-  // ---------------------------------------------------
-  const criarEvento = useCallback(
-    async (eventoData: any, user_id: string) => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        console.log("📝 Criando evento:", eventoData);
-
-        // ✅ ETAPA 1: Inserir o evento
-        const { data: novoEvento, error: insertError } = await supabase
-          .from("eventos_agenda")
-          .insert({
-            nome: eventoData.nome,
-            descricao: eventoData.descricao,
-            data_evento: eventoData.data_evento,
-            data_fim: eventoData.data_fim,
-            multiplos_dias: eventoData.multiplos_dias,
-            hora_inicio: eventoData.hora_inicio,
-            hora_fim: eventoData.hora_fim,
-            dia_inteiro: eventoData.dia_inteiro,
-            local: eventoData.local,
-            endereco_completo: eventoData.endereco_completo,
-            espaco_id: eventoData.espaco_id,
-            status: eventoData.status || "confirmado",
-            observacoes: eventoData.observacoes,
-            criado_por: user_id,
-            sincronizado_google: false
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("❌ Erro ao inserir evento:", insertError);
-          throw insertError;
-        }
-
-        console.log("✅ Evento criado:", novoEvento);
-
-        // ✅ ETAPA 2: Adicionar participantes
-        if (eventoData.participantes_ids && eventoData.participantes_ids.length > 0) {
-          console.log("👥 Adicionando participantes:", eventoData.participantes_ids);
-
-          const participantes = eventoData.participantes_ids.map((pessoa_id: string) => ({
-            evento_id: novoEvento.id,
-            pessoa_id: pessoa_id,
-            confirmacao_presenca: "pendente",
-            notificacao_enviada: false
-          }));
-
-          const { error: participantesError } = await supabase
-            .from("evento_participantes")
-            .insert(participantes);
-
-          if (participantesError) {
-            console.error("❌ Erro ao adicionar participantes:", participantesError);
-            // Não falhar a operação inteira, apenas registrar o erro
-            console.warn("⚠️ Evento criado mas participantes não foram adicionados");
-          } else {
-            console.log("✅ Participantes adicionados com sucesso!");
-          }
-        }
-
-        return novoEvento;
-      } catch (err: any) {
-        console.error("❌ Erro geral ao criar evento:", err);
-        setError(err.message);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  // ---------------------------------------------------
-  // ✏️ ATUALIZAR EVENTO
-  // ---------------------------------------------------
-  const atualizarEvento = useCallback(
-    async (evento_id: string, eventoData: any) => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        console.log("✏️ Atualizando evento:", evento_id, eventoData);
-
-        // ✅ ETAPA 1: Atualizar dados do evento
-        const { data: eventoAtualizado, error: updateError } = await supabase
-          .from("eventos_agenda")
-          .update({
-            nome: eventoData.nome,
-            descricao: eventoData.descricao,
-            data_evento: eventoData.data_evento,
-            data_fim: eventoData.data_fim,
-            multiplos_dias: eventoData.multiplos_dias,
-            hora_inicio: eventoData.hora_inicio,
-            hora_fim: eventoData.hora_fim,
-            dia_inteiro: eventoData.dia_inteiro,
-            local: eventoData.local,
-            endereco_completo: eventoData.endereco_completo,
-            espaco_id: eventoData.espaco_id,
-            status: eventoData.status,
-            observacoes: eventoData.observacoes,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", evento_id)
-          .select()
-          .single();
-
-        if (updateError) {
-          console.error("❌ Erro ao atualizar evento:", updateError);
-          throw updateError;
-        }
-
-        console.log("✅ Evento atualizado:", eventoAtualizado);
-
-        // ✅ ETAPA 2: Atualizar participantes (se fornecido)
-        if (eventoData.participantes_ids !== undefined) {
-          console.log("👥 Atualizando participantes...");
-
-          // Deletar participantes existentes
-          const { error: deleteError } = await supabase
-            .from("evento_participantes")
-            .delete()
-            .eq("evento_id", evento_id);
-
-          if (deleteError) {
-            console.error("❌ Erro ao deletar participantes antigos:", deleteError);
-          }
-
-          // Inserir novos participantes
-          if (eventoData.participantes_ids.length > 0) {
-            const novosParticipantes = eventoData.participantes_ids.map((pessoa_id: string) => ({
-              evento_id,
-              pessoa_id,
-              confirmacao_presenca: "pendente",
-              notificacao_enviada: false
-            }));
-
-            const { error: insertError } = await supabase
-              .from("evento_participantes")
-              .insert(novosParticipantes);
-
-            if (insertError) {
-              console.error("❌ Erro ao inserir novos participantes:", insertError);
-            } else {
-              console.log("✅ Participantes atualizados com sucesso!");
-            }
-          }
-        }
-
-        return eventoAtualizado;
-      } catch (err: any) {
-        console.error("❌ Erro geral ao atualizar evento:", err);
-        setError(err.message);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  // ---------------------------------------------------
-  // 🗑️ DELETAR EVENTO
-  // ---------------------------------------------------
-  const deletarEvento = useCallback(async (evento_id: string) => {
+  const carregarDados = async () => {
     try {
       setLoading(true);
-      setError(null);
+      setError('');
 
-      console.log("🗑️ Deletando evento:", evento_id);
+      console.log('ðŸ”„ Carregando dados do calendÃ¡rio...'); // Debug
 
-      // Os participantes serão deletados automaticamente se houver CASCADE
-      const { error } = await supabase
-        .from("eventos_agenda")
-        .delete()
-        .eq("id", evento_id);
+      const [eventosRes, reservasRes, feriadosRes] = await Promise.all([
+        supabase
+          .from('eventos_agenda')
+          .select(`*, espaco:espaco_id(*)`)
+          .order('data_evento'),
+        supabase
+          .from('reservas_espacos')
+          .select(`*, espaco:espaco_id(*)`)
+          .order('data_reserva'),
+        supabase
+          .from('feriados')
+          .select('*')
+          .order('data')
+      ]);
 
-      if (error) throw error;
+      console.log('ðŸ“… Eventos carregados:', eventosRes.data); // Debug
 
-      console.log("✅ Evento deletado com sucesso!");
+      if (eventosRes.data) setEventos(eventosRes.data as EventoAgenda[]);
+      if (reservasRes.data) setReservas(reservasRes.data as ReservaEspaco[]);
+      if (feriadosRes.data) setFeriados(feriadosRes.data as Feriado[]);
     } catch (err: any) {
-      console.error("❌ Erro ao deletar evento:", err);
-      setError(err.message);
-      throw err;
+      setError('Erro ao carregar dados do calendÃ¡rio');
+      console.error('âŒ Erro ao carregar dados:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  // ---------------------------------------------------
-  // 🟦 CRIAR RESERVA
-  // ---------------------------------------------------
-  const criarReserva = useCallback(
-    async (reservaData: any, user_id: string) => {
-      try {
-        setLoading(true);
-        setError(null);
+  const handleNavigarMes = (direcao: 'anterior' | 'proxima') => {
+    const novaData = new Date(dataAtual);
+    if (direcao === 'anterior') {
+      novaData.setMonth(novaData.getMonth() - 1);
+    } else {
+      novaData.setMonth(novaData.getMonth() + 1);
+    }
+    setDataAtual(novaData);
+  };
 
+  const handleNovoEvento = () => {
+    setEditandoEvento(null);
+    setSelectedEvento(null);
+    setViewMode('form');
+  };
+
+  const handleEditarEvento = (evento: EventoAgenda) => {
+    setEditandoEvento(evento);
+    setViewMode('form');
+  };
+
+  const handleVisualizarEvento = (evento: EventoAgenda) => {
+    setSelectedEvento(evento);
+    setViewMode('detalhes');
+  };
+
+  const handleSalvarEvento = async (eventoData: any) => {
+    try {
+      setError('');
+      console.log('ðŸ’¾ Salvando evento...', eventoData); // Debug
+
+      // âœ… Validar conflitos apenas se nÃ£o for dia inteiro
+      if (!eventoData.dia_inteiro && eventoData.hora_inicio && eventoData.hora_fim) {
         const conflitos = await verificarConflitos(
-          reservaData.espaco_id,
-          reservaData.data_reserva,
-          reservaData.hora_inicio,
-          reservaData.hora_fim
+          eventoData.espaco_id,
+          eventoData.data_evento,
+          eventoData.hora_inicio,
+          eventoData.hora_fim,
+          editandoEvento?.id
         );
 
         if (conflitos.existe) {
-          throw new Error("Existe um conflito de horário. Verifique a disponibilidade.");
+          setError(`Conflito detectado: ${conflitos.conflitos.map(c => c.nome).join(', ')}`);
+          return;
         }
-
-        const { data, error: insertError } = await supabase
-          .from("reservas_espacos")
-          .insert({
-            ...reservaData,
-            criado_por: user_id,
-            status: "confirmada"
-          })
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-        return data;
-      } catch (err: any) {
-        setError(err.message);
-        throw err;
-      } finally {
-        setLoading(false);
       }
-    },
-    [verificarConflitos]
+
+      // âœ… Criar ou atualizar evento
+      if (editandoEvento) {
+        console.log('âœï¸ Atualizando evento existente:', editandoEvento.id);
+        await atualizarEvento(editandoEvento.id, eventoData);
+      } else {
+        console.log('âž• Criando novo evento');
+        if (!user) throw new Error('UsuÃ¡rio nÃ£o autenticado');
+        await criarEvento(eventoData, user.id);
+      }
+
+      // âœ… CORREÃ‡ÃƒO PRINCIPAL: Recarregar dados ANTES de voltar ao calendÃ¡rio
+      console.log('ðŸ”„ Recarregando dados apÃ³s salvar...');
+      await carregarDados();
+
+      // âœ… Limpar estados e voltar ao calendÃ¡rio
+      setViewMode('calendario');
+      setEditandoEvento(null);
+      setSelectedEvento(null);
+
+      console.log('âœ… Evento salvo com sucesso!');
+    } catch (err: any) {
+      console.error('âŒ Erro ao salvar evento:', err);
+      setError(err.message || 'Erro ao salvar evento');
+    }
+  };
+
+  const handleExcluirEvento = async () => {
+    if (!selectedEvento) return;
+
+    if (!confirm('Deseja realmente excluir este evento?')) return;
+
+    try {
+      setError('');
+      console.log('ðŸ—‘ï¸ Excluindo evento:', selectedEvento.id);
+
+      const { error: deleteError } = await supabase
+        .from('eventos_agenda')
+        .delete()
+        .eq('id', selectedEvento.id);
+
+      if (deleteError) throw deleteError;
+
+      // âœ… Recarregar dados apÃ³s excluir
+      console.log('ðŸ”„ Recarregando dados apÃ³s excluir...');
+      await carregarDados();
+
+      // Voltar ao calendÃ¡rio
+      setViewMode('calendario');
+      setSelectedEvento(null);
+
+      console.log('âœ… Evento excluÃ­do com sucesso!');
+    } catch (err: any) {
+      console.error('âŒ Erro ao excluir evento:', err);
+      setError(err.message || 'Erro ao excluir evento');
+    }
+  };
+
+  const handleCancelar = () => {
+    setViewMode('calendario');
+    setEditandoEvento(null);
+    setSelectedEvento(null);
+    setError('');
+  };
+
+  const calendarMes = gerarCalendarMes(
+    dataAtual.getMonth(),
+    dataAtual.getFullYear(),
+    feriados,
+    eventos,
+    reservas
   );
 
-  // Expor funções
-  return {
-    loading,
-    error,
-    setError,
-    verificarConflitos,
-    criarEvento,
-    atualizarEvento,
-    deletarEvento,
-    criarReserva
-  };
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <button
+          onClick={onBack}
+          className="p-2 hover:bg-slate-100 rounded-lg transition"
+        >
+          <ArrowLeft className="w-5 h-5 text-slate-700" />
+        </button>
+        <div className="flex-1">
+          <h2 className="text-2xl font-bold text-slate-900">Agenda da Igreja</h2>
+          <p className="text-slate-600 text-sm">Gerenciar eventos e reservas de espaÃ§os</p>
+        </div>
+        {viewMode === 'calendario' && (
+          <button
+            onClick={handleNovoEvento}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Evento
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {viewMode === 'calendario' && (
+        <>
+          <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+            <button
+              onClick={() => handleNavigarMes('anterior')}
+              className="p-2 hover:bg-slate-100 rounded-lg transition"
+            >
+              <ChevronLeft className="w-5 h-5 text-slate-700" />
+            </button>
+
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-slate-900">
+                {obterNomeMes(dataAtual.getMonth())} de {dataAtual.getFullYear()}
+              </h3>
+            </div>
+
+            <button
+              onClick={() => handleNavigarMes('proxima')}
+              className="p-2 hover:bg-slate-100 rounded-lg transition"
+            >
+              <ChevronRight className="w-5 h-5 text-slate-700" />
+            </button>
+
+            <button
+              onClick={() => setDataAtual(new Date())}
+              className="px-3 py-1 text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition"
+            >
+              Hoje
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="text-slate-600 mt-4">Carregando calendÃ¡rio...</p>
+            </div>
+          ) : (
+            <>
+              <CalendarGrid
+                calendarMes={calendarMes}
+                onSelectEvento={handleVisualizarEvento}
+                onEditarEvento={handleEditarEvento}
+                onNovoEvento={handleNovoEvento}
+              />
+              
+              {/* Contador de eventos */}
+              <div className="text-sm text-slate-600 text-center">
+                ðŸ“… Total: {eventos.length} evento(s) | ðŸ¢ {reservas.length} reserva(s)
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {viewMode === 'form' && (
+        <EventoForm
+          evento={editandoEvento}
+          onSalvar={handleSalvarEvento}
+          onCancelar={handleCancelar}
+          loading={calendarLoading}
+        />
+      )}
+
+      {viewMode === 'detalhes' && selectedEvento && (
+        <EventoDetalhes
+          evento={selectedEvento}
+          onEditar={() => handleEditarEvento(selectedEvento)}
+          onVoltar={handleCancelar}
+          onExcluir={handleExcluirEvento}
+        />
+      )}
+    </div>
+  );
 }
