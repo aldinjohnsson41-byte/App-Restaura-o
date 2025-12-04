@@ -20,6 +20,9 @@ export default function EventoForm({
   const [espacos, setEspacos] = useState<EspacoFisico[]>([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const normalizeUUID = (value: string) => {
+  return value && value.trim() !== '' ? value : null;
+};
 
   const [formData, setFormData] = useState({
     nome: '',
