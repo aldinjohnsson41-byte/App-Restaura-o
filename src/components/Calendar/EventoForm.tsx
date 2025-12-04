@@ -1,313 +1,94 @@
+// EventoForm.tsx CORRIGIDO — usando Supabase real (sem mock)
+
+
 import { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Plus, Trash2, MapPin, Users, Calendar } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
-// IMPORTANTE: Em produção, substitua pela importação real:
-// import { supabase } from '../../lib/supabase';
-
-// Em produção, importe o supabase real:
-// import { supabase } from '../../lib/supabase';
-
-// Simulação para demonstração (remova em produção)
-const supabase = {
-  from: (table) => ({
-    select: (fields) => ({
-      eq: (field, value) => ({
-        order: (orderField) => Promise.resolve({ 
-          data: table === 'espacos_fisicos' ? [
-            { id: '1', nome: 'Salão Principal', capacidade: 200, localizacao: 'Térreo' },
-            { id: '2', nome: 'Sala de Reuniões', capacidade: 30, localizacao: '1º Andar' },
-            { id: '3', nome: 'Auditório', capacidade: 150, localizacao: '2º Andar' }
-          ] : []
-        })
-      }),
-      order: (orderField) => ({
-        limit: (num) => Promise.resolve({ 
-          data: table === 'pessoas' ? [
-            { id: '1', nome_completo: 'João Silva', email: 'joao@email.com', telefone: '(11) 99999-0001' },
-            { id: '2', nome_completo: 'Maria Santos', email: 'maria@email.com', telefone: '(11) 99999-0002' },
-            { id: '3', nome_completo: 'Pedro Oliveira', email: 'pedro@email.com', telefone: '(11) 99999-0003' },
-            { id: '4', nome_completo: 'Ana Costa', email: 'ana@email.com', telefone: '(11) 99999-0004' }
-          ] : []
-        })
-      }),
-      ilike: (field, value) => ({
-        order: (orderField) => ({
-          limit: (num) => Promise.resolve({ data: [] })
-        })
-      })
-    })
-  })
-};
 
 export default function EventoFormMelhorado() {
-  const [espacos, setEspacos] = useState([]);
-  const [pessoas, setPessoas] = useState([]);
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [searchPessoa, setSearchPessoa] = useState('');
-  const [showMap, setShowMap] = useState(false);
-  const [loadingPessoas, setLoadingPessoas] = useState(false);
+const [espacos, setEspacos] = useState([]);
+const [pessoas, setPessoas] = useState([]);
+const [error, setError] = useState('');
+const [submitting, setSubmitting] = useState(false);
+const [searchPessoa, setSearchPessoa] = useState('');
+const [showMap, setShowMap] = useState(false);
+const [loadingPessoas, setLoadingPessoas] = useState(false);
 
-  const [formData, setFormData] = useState({
-    nome: '',
-    descricao: '',
-    data_inicio: new Date().toISOString().split('T')[0],
-    data_fim: new Date().toISOString().split('T')[0],
-    hora_inicio: '09:00',
-    hora_fim: '10:00',
-    dia_inteiro: false,
-    multiplos_dias: false,
-    local: '',
-    endereco_completo: '',
-    espaco_id: '',
-    status: 'confirmado',
-    observacoes: '',
-    participantes: []
-  });
 
-  useEffect(() => {
-    carregarEspacos();
-  }, []);
+const [formData, setFormData] = useState({
+nome: '',
+descricao: '',
+data_inicio: new Date().toISOString().split('T')[0],
+data_fim: new Date().toISOString().split('T')[0],
+hora_inicio: '09:00',
+hora_fim: '10:00',
+dia_inteiro: false,
+multiplos_dias: false,
+local: '',
+endereco_completo: '',
+espaco_id: '',
+status: 'confirmado',
+observacoes: '',
+participantes: []
+});
 
-  useEffect(() => {
-    if (searchPessoa.length >= 2) {
-      buscarPessoas(searchPessoa);
-    } else {
-      setPessoas([]);
-    }
-  }, [searchPessoa]);
 
-  const carregarEspacos = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('espacos_fisicos')
-        .select('*')
-        .eq('ativo', true)
-        .order('nome');
+useEffect(() => {
+carregarEspacos();
+}, []);
 
-      if (data && !error) {
-        setEspacos(data);
-      }
-    } catch (err) {
-      console.error('Erro ao carregar espaços:', err);
-    }
-  };
 
-  const buscarPessoas = async (termo) => {
-    if (!termo || termo.length < 2) {
-      setPessoas([]);
-      return;
-    }
+useEffect(() => {
+if (searchPessoa.length >= 2) {
+buscarPessoas(searchPessoa);
+} else {
+setPessoas([]);
+}
+}, [searchPessoa]);
 
-    try {
-      setLoadingPessoas(true);
-      
-      const { data, error } = await supabase
-        .from('pessoas')
-        .select('id, nome_completo, email, telefone, whatsapp')
-        .or(`nome_completo.ilike.%${termo}%,email.ilike.%${termo}%`)
-        .order('nome_completo')
-        .limit(20);
 
-      if (data && !error) {
-        setPessoas(data);
-      } else {
-        setPessoas([]);
-      }
-    } catch (err) {
-      console.error('Erro ao buscar pessoas:', err);
-      setPessoas([]);
-    } finally {
-      setLoadingPessoas(false);
-    }
-  };
+const carregarEspacos = async () => {
+try {
+const { data, error } = await supabase
+.from('espacos_fisicos')
+.select('*')
+.eq('ativo', true)
+.order('nome');
 
-  const handleAdicionarParticipante = (pessoa) => {
-    if (formData.participantes.find(p => p.id === pessoa.id)) {
-      setError('Esta pessoa já foi adicionada');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
 
-    setFormData({
-      ...formData,
-      participantes: [...formData.participantes, {
-        id: pessoa.id,
-        nome_completo: pessoa.nome_completo,
-        email: pessoa.email || '',
-        telefone: pessoa.telefone || pessoa.whatsapp || '',
-        confirmacao: 'pendente'
-      }]
-    });
-    setSearchPessoa(''); // Limpa o campo de busca
-    setPessoas([]); // Limpa os resultados
-  };
+if (data && !error) {
+setEspacos(data);
+}
+} catch (err) {
+console.error('Erro ao carregar espaços:', err);
+}
+};
 
-  const handleRemoverParticipante = (pessoaId) => {
-    setFormData({
-      ...formData,
-      participantes: formData.participantes.filter(p => p.id !== pessoaId)
-    });
-  };
 
-  const handleLocalizarMapa = () => {
-    if (!formData.endereco_completo) {
-      setError('Digite o endereço completo para localizar no mapa');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
+const buscarPessoas = async (termo) => {
+try {
+setLoadingPessoas(true);
 
-    const enderecoEncoded = encodeURIComponent(formData.endereco_completo);
-    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${enderecoEncoded}`;
-    window.open(mapUrl, '_blank');
-    setShowMap(true);
-  };
 
-  const handleSubmit = async () => {
-    setError('');
+const { data, error } = await supabase
+.from('pessoas')
+.select('id, nome_completo, email, telefone, whatsapp')
+.or(`nome_completo.ilike.%${termo}%,email.ilike.%${termo}%`)
+.order('nome_completo')
+.limit(20);
 
-    if (!formData.nome.trim()) {
-      setError('Nome do evento é obrigatório');
-      return;
-    }
 
-    if (formData.multiplos_dias && formData.data_inicio > formData.data_fim) {
-      setError('Data de início deve ser anterior à data de fim');
-      return;
-    }
-
-    if (!formData.dia_inteiro && formData.hora_inicio >= formData.hora_fim) {
-      setError('Horário de início deve ser anterior ao horário de fim');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      
-      // Preparar dados para salvar
-      const eventoData = {
-        ...formData,
-        // Se multiplos_dias for false, usa data_inicio como data_evento
-        data_evento: formData.data_inicio,
-        // Array de IDs dos participantes
-        participantes_ids: formData.participantes.map(p => p.id)
-      };
-      
-      console.log('Salvando evento:', eventoData);
-      
-      // AQUI VOCÊ DEVE CHAMAR SUA FUNÇÃO DE SALVAR:
-      // await criarEvento(eventoData, user.id);
-      
-      // Simular salvamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      alert('Evento salvo com sucesso!');
-      
-      // Reset form
-      setFormData({
-        nome: '',
-        descricao: '',
-        data_inicio: new Date().toISOString().split('T')[0],
-        data_fim: new Date().toISOString().split('T')[0],
-        hora_inicio: '09:00',
-        hora_fim: '10:00',
-        dia_inteiro: false,
-        multiplos_dias: false,
-        local: '',
-        endereco_completo: '',
-        espaco_id: '',
-        status: 'confirmado',
-        observacoes: '',
-        participantes: []
-      });
-      
-    } catch (err) {
-      setError(err.message || 'Erro ao salvar evento');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const pessoasFiltradas = pessoas.filter(p => 
-    p.nome_completo.toLowerCase().includes(searchPessoa.toLowerCase()) ||
-    p.email.toLowerCase().includes(searchPessoa.toLowerCase())
-  );
-
-  const calcularDiasEvento = () => {
-    if (!formData.multiplos_dias) return 1;
-    const inicio = new Date(formData.data_inicio);
-    const fim = new Date(formData.data_fim);
-    const diffTime = Math.abs(fim - inicio);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return diffDays;
-  };
-
-  return (
-    <div className="max-w-5xl mx-auto p-6 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
-      <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-slate-900">
-            Novo Evento
-          </h3>
-        </div>
-
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3 animate-pulse">
-            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-            <div>{error}</div>
-          </div>
-        )}
-
-        <div className="space-y-6">
-          {/* Informações Básicas */}
-          <div className="space-y-4">
-            <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              Informações Básicas
-            </h4>
-            
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Nome do Evento *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Ex: Culto, Reunião, Confraternização..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Descrição
-              </label>
-              <textarea
-                value={formData.descricao}
-                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                rows={3}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Detalhes do evento..."
-              />
-            </div>
-          </div>
-
-          {/* Datas e Horários */}
-          <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-            <h4 className="font-semibold text-slate-900">Datas e Horários</h4>
-            
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.dia_inteiro}
-                  onChange={(e) => setFormData({ ...formData, dia_inteiro: e.target.checked })}
-                  className="w-4 h-4 border border-slate-300 rounded"
-                />
-                <span className="text-sm font-medium text-slate-700">Dia inteiro</span>
-              </label>
+if (!error) {
+setPessoas(data || []);
+} else {
+setPessoas([]);
+}
+} catch (err) {
+console.error('Erro ao buscar pessoas:', err);
+setPessoas([]);
+} finally {
+</label>
 
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
