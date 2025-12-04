@@ -1,54 +1,25 @@
 import { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Plus, Trash2, MapPin, Users, Calendar } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
-// IMPORTANTE: Em produção, substitua pela importação real:
-// import { supabase } from '../../lib/supabase';
-
-// Em produção, importe o supabase real:
-// import { supabase } from '../../lib/supabase';
-
-// Simulação para demonstração (remova em produção)
-const supabase = {
-  from: (table) => ({
-    select: (fields) => ({
-      eq: (field, value) => ({
-        order: (orderField) => Promise.resolve({ 
-          data: table === 'espacos_fisicos' ? [
-            { id: '1', nome: 'Salão Principal', capacidade: 200, localizacao: 'Térreo' },
-            { id: '2', nome: 'Sala de Reuniões', capacidade: 30, localizacao: '1º Andar' },
-            { id: '3', nome: 'Auditório', capacidade: 150, localizacao: '2º Andar' }
-          ] : []
-        })
-      }),
-      order: (orderField) => ({
-        limit: (num) => Promise.resolve({ 
-          data: table === 'pessoas' ? [
-            { id: '1', nome_completo: 'João Silva', email: 'joao@email.com', telefone: '(11) 99999-0001' },
-            { id: '2', nome_completo: 'Maria Santos', email: 'maria@email.com', telefone: '(11) 99999-0002' },
-            { id: '3', nome_completo: 'Pedro Oliveira', email: 'pedro@email.com', telefone: '(11) 99999-0003' },
-            { id: '4', nome_completo: 'Ana Costa', email: 'ana@email.com', telefone: '(11) 99999-0004' }
-          ] : []
-        })
-      }),
-      ilike: (field, value) => ({
-        order: (orderField) => ({
-          limit: (num) => Promise.resolve({ data: [] })
-        })
-      })
-    })
-  })
-};
+/**
+ * EventoForm.tsx — Versão completa e funcional
+ * - Removeu o mock e usa supabase real
+ * - Busca dinâmica de pessoas com .or(...).ilike
+ * - Carrega espaços físicos
+ * - Insere evento em 'eventos_agenda' (altere caso necessário)
+ * - Mantive a UI e comportamento original
+ */
 
 export default function EventoFormMelhorado() {
-  const [espacos, setEspacos] = useState([]);
-  const [pessoas, setPessoas] = useState([]);
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [searchPessoa, setSearchPessoa] = useState('');
-  const [showMap, setShowMap] = useState(false);
-  const [loadingPessoas, setLoadingPessoas] = useState(false);
+  const [espacos, setEspacos] = useState<any[]>([]);
+  const [pessoas, setPessoas] = useState<any[]>([]);
+  const [error, setError] = useState<string>('');
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [searchPessoa, setSearchPessoa] = useState<string>('');
+  const [loadingPessoas, setLoadingPessoas] = useState<boolean>(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<any>({
     nome: '',
     descricao: '',
     data_inicio: new Date().toISOString().split('T')[0],
@@ -71,12 +42,14 @@ export default function EventoFormMelhorado() {
 
   useEffect(() => {
     if (searchPessoa.length >= 2) {
-      buscarPessoas(searchPessoa);
+      const t = searchPessoa.trim();
+      buscarPessoas(t);
     } else {
       setPessoas([]);
     }
   }, [searchPessoa]);
 
+  // Load espacos físicos
   const carregarEspacos = async () => {
     try {
       const { data, error } = await supabase
@@ -85,15 +58,15 @@ export default function EventoFormMelhorado() {
         .eq('ativo', true)
         .order('nome');
 
-      if (data && !error) {
-        setEspacos(data);
-      }
+      if (error) throw error;
+      setEspacos(data || []);
     } catch (err) {
       console.error('Erro ao carregar espaços:', err);
     }
   };
 
-  const buscarPessoas = async (termo) => {
+  // Buscar pessoas com OR ilike (nome ou email)
+  const buscarPessoas = async (termo: string) => {
     if (!termo || termo.length < 2) {
       setPessoas([]);
       return;
@@ -101,7 +74,7 @@ export default function EventoFormMelhorado() {
 
     try {
       setLoadingPessoas(true);
-      
+
       const { data, error } = await supabase
         .from('pessoas')
         .select('id, nome_completo, email, telefone, whatsapp')
@@ -109,11 +82,8 @@ export default function EventoFormMelhorado() {
         .order('nome_completo')
         .limit(20);
 
-      if (data && !error) {
-        setPessoas(data);
-      } else {
-        setPessoas([]);
-      }
+      if (error) throw error;
+      setPessoas(data || []);
     } catch (err) {
       console.error('Erro ao buscar pessoas:', err);
       setPessoas([]);
@@ -122,32 +92,36 @@ export default function EventoFormMelhorado() {
     }
   };
 
-  const handleAdicionarParticipante = (pessoa) => {
-    if (formData.participantes.find(p => p.id === pessoa.id)) {
+  const handleAdicionarParticipante = (pessoa: any) => {
+    if (formData.participantes.find((p: any) => p.id === pessoa.id)) {
       setError('Esta pessoa já foi adicionada');
       setTimeout(() => setError(''), 3000);
       return;
     }
 
-    setFormData({
-      ...formData,
-      participantes: [...formData.participantes, {
-        id: pessoa.id,
-        nome_completo: pessoa.nome_completo,
-        email: pessoa.email || '',
-        telefone: pessoa.telefone || pessoa.whatsapp || '',
-        confirmacao: 'pendente'
-      }]
-    });
-    setSearchPessoa(''); // Limpa o campo de busca
-    setPessoas([]); // Limpa os resultados
+    setFormData((prev: any) => ({
+      ...prev,
+      participantes: [
+        ...prev.participantes,
+        {
+          id: pessoa.id,
+          nome_completo: pessoa.nome_completo,
+          email: pessoa.email || '',
+          telefone: pessoa.telefone || pessoa.whatsapp || '',
+          confirmacao: 'pendente'
+        }
+      ]
+    }));
+
+    setSearchPessoa('');
+    setPessoas([]);
   };
 
-  const handleRemoverParticipante = (pessoaId) => {
-    setFormData({
-      ...formData,
-      participantes: formData.participantes.filter(p => p.id !== pessoaId)
-    });
+  const handleRemoverParticipante = (pessoaId: string) => {
+    setFormData((prev: any) => ({
+      ...prev,
+      participantes: prev.participantes.filter((p: any) => p.id !== pessoaId)
+    }));
   };
 
   const handleLocalizarMapa = () => {
@@ -160,7 +134,6 @@ export default function EventoFormMelhorado() {
     const enderecoEncoded = encodeURIComponent(formData.endereco_completo);
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${enderecoEncoded}`;
     window.open(mapUrl, '_blank');
-    setShowMap(true);
   };
 
   const handleSubmit = async () => {
@@ -183,27 +156,35 @@ export default function EventoFormMelhorado() {
 
     try {
       setSubmitting(true);
-      
-      // Preparar dados para salvar
-      const eventoData = {
-        ...formData,
-        // Se multiplos_dias for false, usa data_inicio como data_evento
+
+      // Preparar payload. Ajuste campos conforme sua tabela.
+      const payload: any = {
+        nome: formData.nome,
+        descricao: formData.descricao,
         data_evento: formData.data_inicio,
-        // Array de IDs dos participantes
-        participantes_ids: formData.participantes.map(p => p.id)
+        data_inicio: formData.data_inicio,
+        data_fim: formData.data_fim,
+        hora_inicio: formData.dia_inteiro ? null : formData.hora_inicio,
+        hora_fim: formData.dia_inteiro ? null : formData.hora_fim,
+        dia_inteiro: formData.dia_inteiro,
+        multiplos_dias: formData.multiplos_dias,
+        local: formData.local,
+        endereco_completo: formData.endereco_completo,
+        espaco_id: formData.espaco_id || null,
+        status: formData.status,
+        observacoes: formData.observacoes,
+        participantes_ids: formData.participantes.map((p: any) => p.id)
       };
-      
-      console.log('Salvando evento:', eventoData);
-      
-      // AQUI VOCÊ DEVE CHAMAR SUA FUNÇÃO DE SALVAR:
-      // await criarEvento(eventoData, user.id);
-      
-      // Simular salvamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
+      // Insere na tabela 'eventos_agenda' — ajuste nome se necessário
+      const { error } = await supabase.from('eventos_agenda').insert(payload);
+
+      if (error) throw error;
+
+      // sucesso
       alert('Evento salvo com sucesso!');
-      
-      // Reset form
+
+      // reset
       setFormData({
         nome: '',
         descricao: '',
@@ -220,26 +201,25 @@ export default function EventoFormMelhorado() {
         observacoes: '',
         participantes: []
       });
-      
-    } catch (err) {
+    } catch (err: any) {
+      console.error(err);
       setError(err.message || 'Erro ao salvar evento');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const pessoasFiltradas = pessoas.filter(p => 
-    p.nome_completo.toLowerCase().includes(searchPessoa.toLowerCase()) ||
-    p.email.toLowerCase().includes(searchPessoa.toLowerCase())
+  const pessoasFiltradas = pessoas.filter((p) =>
+    (p.nome_completo || '').toLowerCase().includes(searchPessoa.toLowerCase()) ||
+    (p.email || '').toLowerCase().includes(searchPessoa.toLowerCase())
   );
 
   const calcularDiasEvento = () => {
     if (!formData.multiplos_dias) return 1;
     const inicio = new Date(formData.data_inicio);
     const fim = new Date(formData.data_fim);
-    const diffTime = Math.abs(fim - inicio);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return diffDays;
+    const diffTime = Math.abs(fim.getTime() - inicio.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   };
 
   return (
@@ -265,7 +245,7 @@ export default function EventoFormMelhorado() {
               <Calendar className="w-5 h-5 text-blue-600" />
               Informações Básicas
             </h4>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Nome do Evento *
@@ -297,7 +277,7 @@ export default function EventoFormMelhorado() {
           {/* Datas e Horários */}
           <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <h4 className="font-semibold text-slate-900">Datas e Horários</h4>
-            
+
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -472,10 +452,10 @@ export default function EventoFormMelhorado() {
               )}
             </div>
 
-            {searchPessoa.length >= 2 && pessoas.length > 0 && (
+            {searchPessoa.length >= 2 && pessoasFiltradas.length > 0 && (
               <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg bg-white shadow-lg">
-                {pessoas.map((pessoa) => {
-                  const jaAdicionado = formData.participantes.find(p => p.id === pessoa.id);
+                {pessoasFiltradas.map((pessoa) => {
+                  const jaAdicionado = formData.participantes.find((p: any) => p.id === pessoa.id);
                   return (
                     <button
                       key={pessoa.id}
@@ -483,8 +463,8 @@ export default function EventoFormMelhorado() {
                       onClick={() => handleAdicionarParticipante(pessoa)}
                       disabled={jaAdicionado}
                       className={`w-full text-left px-4 py-3 transition border-b border-slate-200 last:border-b-0 ${
-                        jaAdicionado 
-                          ? 'bg-slate-100 cursor-not-allowed opacity-60' 
+                        jaAdicionado
+                          ? 'bg-slate-100 cursor-not-allowed opacity-60'
                           : 'hover:bg-blue-50 cursor-pointer'
                       }`}
                     >
@@ -508,7 +488,7 @@ export default function EventoFormMelhorado() {
               </div>
             )}
 
-            {searchPessoa.length >= 2 && !loadingPessoas && pessoas.length === 0 && (
+            {searchPessoa.length >= 2 && !loadingPessoas && pessoasFiltradas.length === 0 && (
               <div className="p-4 text-center text-slate-500 text-sm bg-slate-50 rounded-lg border border-slate-200">
                 Nenhuma pessoa encontrada
               </div>
@@ -523,7 +503,7 @@ export default function EventoFormMelhorado() {
             {formData.participantes.length > 0 && (
               <div className="space-y-2">
                 <h5 className="text-sm font-medium text-slate-700">Participantes Adicionados:</h5>
-                {formData.participantes.map((participante) => (
+                {formData.participantes.map((participante: any) => (
                   <div
                     key={participante.id}
                     className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200"
