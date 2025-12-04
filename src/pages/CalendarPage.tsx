@@ -40,12 +40,32 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
       setLoading(true);
       setError('');
 
-      console.log('ðŸ”„ Carregando dados do calendÃ¡rio...'); // Debug
+      console.log('📄 Carregando dados do calendário...'); 
 
       const [eventosRes, reservasRes, feriadosRes] = await Promise.all([
+        // ✅ CORREÇÃO: Incluir participantes na query
         supabase
           .from('eventos_agenda')
-          .select(`*, espaco:espaco_id(*)`)
+          .select(`
+            *,
+            espaco:espaco_id(*),
+            participantes:evento_participantes(
+              id,
+              pessoa_id,
+              confirmacao_presenca,
+              data_confirmacao,
+              notificacao_enviada,
+              email_enviado_para,
+              created_at,
+              pessoa:pessoa_id(
+                id,
+                nome_completo,
+                email,
+                telefone,
+                whatsapp
+              )
+            )
+          `)
           .order('data_evento'),
         supabase
           .from('reservas_espacos')
@@ -57,14 +77,24 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
           .order('data')
       ]);
 
-      console.log('ðŸ“… Eventos carregados:', eventosRes.data); // Debug
-
-      if (eventosRes.data) setEventos(eventosRes.data as EventoAgenda[]);
+      console.log('📅 Response completo:', eventosRes);
+      console.log('❌ Erro na query?:', eventosRes.error);
+      console.log('📅 Eventos carregados:', eventosRes.data);
+      
+      if (eventosRes.data && eventosRes.data.length > 0) {
+        console.log('👥 Primeiro evento:', eventosRes.data[0]);
+        console.log('👥 Participantes do primeiro evento:', eventosRes.data[0]?.participantes);
+        console.log('👥 Quantidade de participantes:', eventosRes.data[0]?.participantes?.length);
+      }
+      
+      if (eventosRes.data) {
+        setEventos(eventosRes.data as EventoAgenda[]);
+      }
       if (reservasRes.data) setReservas(reservasRes.data as ReservaEspaco[]);
       if (feriadosRes.data) setFeriados(feriadosRes.data as Feriado[]);
     } catch (err: any) {
-      setError('Erro ao carregar dados do calendÃ¡rio');
-      console.error('âŒ Erro ao carregar dados:', err);
+      setError('Erro ao carregar dados do calendário');
+      console.error('❌ Erro ao carregar dados:', err);
     } finally {
       setLoading(false);
     }
@@ -99,9 +129,9 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
   const handleSalvarEvento = async (eventoData: any) => {
     try {
       setError('');
-      console.log('ðŸ’¾ Salvando evento...', eventoData); // Debug
+      console.log('💾 Salvando evento...', eventoData);
 
-      // âœ… Validar conflitos apenas se nÃ£o for dia inteiro
+      // ✅ Validar conflitos apenas se não for dia inteiro
       if (!eventoData.dia_inteiro && eventoData.hora_inicio && eventoData.hora_fim) {
         const conflitos = await verificarConflitos(
           eventoData.espaco_id,
@@ -117,28 +147,28 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
         }
       }
 
-      // âœ… Criar ou atualizar evento
+      // ✅ Criar ou atualizar evento
       if (editandoEvento) {
-        console.log('âœï¸ Atualizando evento existente:', editandoEvento.id);
+        console.log('✏️ Atualizando evento existente:', editandoEvento.id);
         await atualizarEvento(editandoEvento.id, eventoData);
       } else {
-        console.log('âž• Criando novo evento');
-        if (!user) throw new Error('UsuÃ¡rio nÃ£o autenticado');
+        console.log('➕ Criando novo evento');
+        if (!user) throw new Error('Usuário não autenticado');
         await criarEvento(eventoData, user.id);
       }
 
-      // âœ… CORREÃ‡ÃƒO PRINCIPAL: Recarregar dados ANTES de voltar ao calendÃ¡rio
-      console.log('ðŸ”„ Recarregando dados apÃ³s salvar...');
+      // ✅ CORREÇÃO PRINCIPAL: Recarregar dados ANTES de voltar ao calendário
+      console.log('🔄 Recarregando dados após salvar...');
       await carregarDados();
 
-      // âœ… Limpar estados e voltar ao calendÃ¡rio
+      // ✅ Limpar estados e voltar ao calendário
       setViewMode('calendario');
       setEditandoEvento(null);
       setSelectedEvento(null);
 
-      console.log('âœ… Evento salvo com sucesso!');
+      console.log('✅ Evento salvo com sucesso!');
     } catch (err: any) {
-      console.error('âŒ Erro ao salvar evento:', err);
+      console.error('❌ Erro ao salvar evento:', err);
       setError(err.message || 'Erro ao salvar evento');
     }
   };
@@ -150,7 +180,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
 
     try {
       setError('');
-      console.log('ðŸ—‘ï¸ Excluindo evento:', selectedEvento.id);
+      console.log('🗑️ Excluindo evento:', selectedEvento.id);
 
       const { error: deleteError } = await supabase
         .from('eventos_agenda')
@@ -159,17 +189,17 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
 
       if (deleteError) throw deleteError;
 
-      // âœ… Recarregar dados apÃ³s excluir
-      console.log('ðŸ”„ Recarregando dados apÃ³s excluir...');
+      // ✅ Recarregar dados após excluir
+      console.log('🔄 Recarregando dados após excluir...');
       await carregarDados();
 
-      // Voltar ao calendÃ¡rio
+      // Voltar ao calendário
       setViewMode('calendario');
       setSelectedEvento(null);
 
-      console.log('âœ… Evento excluÃ­do com sucesso!');
+      console.log('✅ Evento excluído com sucesso!');
     } catch (err: any) {
-      console.error('âŒ Erro ao excluir evento:', err);
+      console.error('❌ Erro ao excluir evento:', err);
       setError(err.message || 'Erro ao excluir evento');
     }
   };
@@ -200,7 +230,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
         </button>
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-slate-900">Agenda da Igreja</h2>
-          <p className="text-slate-600 text-sm">Gerenciar eventos e reservas de espaÃ§os</p>
+          <p className="text-slate-600 text-sm">Gerenciar eventos e reservas de espaços</p>
         </div>
         {viewMode === 'calendario' && (
           <button
@@ -253,7 +283,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
           {loading ? (
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="text-slate-600 mt-4">Carregando calendÃ¡rio...</p>
+              <p className="text-slate-600 mt-4">Carregando calendário...</p>
             </div>
           ) : (
             <>
@@ -266,7 +296,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
               
               {/* Contador de eventos */}
               <div className="text-sm text-slate-600 text-center">
-                ðŸ“… Total: {eventos.length} evento(s) | ðŸ¢ {reservas.length} reserva(s)
+                📅 Total: {eventos.length} evento(s) | 🏢 {reservas.length} reserva(s)
               </div>
             </>
           )}
