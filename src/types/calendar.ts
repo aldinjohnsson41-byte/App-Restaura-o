@@ -26,6 +26,10 @@ export interface EventoAgenda {
   nome: string;
   descricao?: string;
   data_evento: string;
+  // ✅ Novos campos para múltiplos dias
+  data_fim?: string;
+  multiplos_dias?: boolean;
+  endereco_completo?: string;
   hora_inicio?: string;
   hora_fim?: string;
   dia_inteiro: boolean;
@@ -120,14 +124,18 @@ export interface ConfiguracaoNotificacoes {
   updated_at: string;
 }
 
+// ✅ Interface atualizada com novos campos
 export interface EventoFormData {
   nome: string;
   descricao: string;
   data_evento: string;
+  data_fim?: string;
+  multiplos_dias?: boolean;
   hora_inicio: string;
   hora_fim: string;
   dia_inteiro: boolean;
   local: string;
+  endereco_completo?: string;
   espaco_id: string;
   status: 'confirmado' | 'pendente' | 'cancelado';
   participantes_ids: string[];
