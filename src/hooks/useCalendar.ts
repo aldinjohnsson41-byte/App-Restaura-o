@@ -95,34 +95,62 @@ export function useCalendar() {
         setLoading(true);
         setError(null);
 
-        const { data, error: insertError } = await supabase
+        console.log('📝 Criando evento:', eventoData);
+
+        // ✅ 1. Criar o evento primeiro
+        const { data: novoEvento, error: insertError } = await supabase
           .from('eventos_agenda')
           .insert({
-            ...eventoData,
+            nome: eventoData.nome,
+            descricao: eventoData.descricao,
+            data_evento: eventoData.data_evento,
+            data_fim: eventoData.data_fim,
+            multiplos_dias: eventoData.multiplos_dias,
+            hora_inicio: eventoData.hora_inicio,
+            hora_fim: eventoData.hora_fim,
+            dia_inteiro: eventoData.dia_inteiro,
+            local: eventoData.local,
+            endereco_completo: eventoData.endereco_completo,
+            espaco_id: eventoData.espaco_id,
+            status: eventoData.status || 'confirmado',
+            observacoes: eventoData.observacoes,
             criado_por: user_id,
-            status: 'confirmado',
           })
           .select()
           .single();
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('❌ Erro ao criar evento:', insertError);
+          throw insertError;
+        }
 
+        console.log('✅ Evento criado:', novoEvento);
+
+        // ✅ 2. Adicionar participantes se houver
         if (eventoData.participantes_ids && eventoData.participantes_ids.length > 0) {
+          console.log('👥 Adicionando participantes:', eventoData.participantes_ids);
+
           const participantes = eventoData.participantes_ids.map((pessoa_id: string) => ({
-            evento_id: data.id,
-            pessoa_id,
+            evento_id: novoEvento.id,
+            pessoa_id: pessoa_id,
             confirmacao_presenca: 'pendente',
           }));
 
           const { error: participantesError } = await supabase
-            .from('participantes_evento')
+            .from('evento_participantes')
             .insert(participantes);
 
-          if (participantesError) throw participantesError;
+          if (participantesError) {
+            console.error('❌ Erro ao adicionar participantes:', participantesError);
+            // ⚠️ Não falha toda a operação se só os participantes falharem
+          } else {
+            console.log('✅ Participantes adicionados com sucesso');
+          }
         }
 
-        return data;
+        return novoEvento;
       } catch (err: any) {
+        console.error('❌ Erro geral:', err);
         setError(err.message);
         throw err;
       } finally {
@@ -138,38 +166,70 @@ export function useCalendar() {
         setLoading(true);
         setError(null);
 
-        const { data, error: updateError } = await supabase
+        console.log('✏️ Atualizando evento:', evento_id, eventoData);
+
+        // ✅ 1. Atualizar o evento
+        const { data: eventoAtualizado, error: updateError } = await supabase
           .from('eventos_agenda')
-          .update(eventoData)
+          .update({
+            nome: eventoData.nome,
+            descricao: eventoData.descricao,
+            data_evento: eventoData.data_evento,
+            data_fim: eventoData.data_fim,
+            multiplos_dias: eventoData.multiplos_dias,
+            hora_inicio: eventoData.hora_inicio,
+            hora_fim: eventoData.hora_fim,
+            dia_inteiro: eventoData.dia_inteiro,
+            local: eventoData.local,
+            endereco_completo: eventoData.endereco_completo,
+            espaco_id: eventoData.espaco_id,
+            status: eventoData.status,
+            observacoes: eventoData.observacoes,
+          })
           .eq('id', evento_id)
           .select()
           .single();
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('❌ Erro ao atualizar evento:', updateError);
+          throw updateError;
+        }
 
+        console.log('✅ Evento atualizado:', eventoAtualizado);
+
+        // ✅ 2. Atualizar participantes se fornecido
         if (eventoData.participantes_ids !== undefined) {
+          console.log('👥 Atualizando participantes...');
+
+          // Deletar participantes antigos
           await supabase
-            .from('participantes_evento')
+            .from('evento_participantes')
             .delete()
             .eq('evento_id', evento_id);
 
+          // Adicionar novos participantes
           if (eventoData.participantes_ids.length > 0) {
             const participantes = eventoData.participantes_ids.map((pessoa_id: string) => ({
               evento_id: evento_id,
-              pessoa_id,
+              pessoa_id: pessoa_id,
               confirmacao_presenca: 'pendente',
             }));
 
             const { error: participantesError } = await supabase
-              .from('participantes_evento')
+              .from('evento_participantes')
               .insert(participantes);
 
-            if (participantesError) throw participantesError;
+            if (participantesError) {
+              console.error('❌ Erro ao atualizar participantes:', participantesError);
+            } else {
+              console.log('✅ Participantes atualizados com sucesso');
+            }
           }
         }
 
-        return data;
+        return eventoAtualizado;
       } catch (err: any) {
+        console.error('❌ Erro geral:', err);
         setError(err.message);
         throw err;
       } finally {
@@ -184,13 +244,18 @@ export function useCalendar() {
       setLoading(true);
       setError(null);
 
+      console.log('🗑️ Deletando evento:', evento_id);
+
       const { error } = await supabase
         .from('eventos_agenda')
         .delete()
         .eq('id', evento_id);
 
       if (error) throw error;
+
+      console.log('✅ Evento deletado com sucesso');
     } catch (err: any) {
+      console.error('❌ Erro ao deletar:', err);
       setError(err.message);
       throw err;
     } finally {
