@@ -187,11 +187,12 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
     try {
       setSubmitting(true);
 
+      // ✅ CORREÇÃO PRINCIPAL: Incluir ID quando estiver editando
       const payload = {
-        id: evento?.id || null,   // 👈 ESSA LINHA É O QUE FALTAVA!
+        ...(evento?.id && { id: evento.id }), // ⭐ Adiciona ID para edição
         nome: formData.nome,
         descricao: formData.descricao,
-        data_evento: formData.data_inicio,
+        data_evento: formData.data_inicio, // ⭐ Campo correto para o banco
         data_fim: formData.multiplos_dias ? formData.data_fim : formData.data_inicio,
         hora_inicio: formData.dia_inteiro ? null : formData.hora_inicio,
         hora_fim: formData.dia_inteiro ? null : formData.hora_fim,
@@ -204,11 +205,10 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
         participantes_ids: formData.participantes.map((p: any) => p.id)
       };
 
-
       await onSalvar(payload);
       
-      alert('Evento salvo com sucesso!');
-      onCancelar();
+      // ✅ Não fechar automaticamente - deixar a página pai controlar
+      // onCancelar() será chamado pela CalendarPage após recarregar
 
     } catch (err: any) {
       console.error(err);
