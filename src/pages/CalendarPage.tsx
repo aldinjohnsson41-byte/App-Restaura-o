@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useCalendar } from '../hooks/useCalendar';
 import { EventoAgenda, ReservaEspaco, Feriado } from '../types/calendar';
@@ -59,7 +59,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
       if (reservasRes.data) setReservas(reservasRes.data as ReservaEspaco[]);
       if (feriadosRes.data) setFeriados(feriadosRes.data as Feriado[]);
     } catch (err: any) {
-      setError('Erro ao carregar dados do calendÃ¡rio');
+      setError('Erro ao carregar dados do calendário');
       console.error(err);
     } finally {
       setLoading(false);
@@ -114,7 +114,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
       if (editandoEvento) {
         await atualizarEvento(editandoEvento.id, eventoData);
       } else {
-        if (!user) throw new Error('UsuÃ¡rio nÃ£o autenticado');
+        if (!user) throw new Error('Usuário não autenticado');
         await criarEvento(eventoData, user.id);
       }
 
@@ -152,7 +152,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
         </button>
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-slate-900">Agenda da Igreja</h2>
-          <p className="text-slate-600 text-sm">Gerenciar eventos e reservas de espaÃ§os</p>
+          <p className="text-slate-600 text-sm">Gerenciar eventos e reservas de espaços</p>
         </div>
         {viewMode === 'calendario' && (
           <button
@@ -204,7 +204,7 @@ export default function CalendarPage({ onBack }: CalendarPageProps) {
 
           {loading ? (
             <div className="text-center py-12">
-              <p className="text-slate-600">Carregando calendÃ¡rio...</p>
+              <p className="text-slate-600">Carregando calendário...</p>
             </div>
           ) : (
             <CalendarGrid
