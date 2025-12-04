@@ -1,4 +1,4 @@
-import { Users, BookOpen, UsersRound, Settings } from 'lucide-react';
+import { Users, BookOpen, UsersRound, Settings, Calendar } from 'lucide-react';
 
 interface HomePageProps {
   onNavigate: (page: string) => void;
@@ -28,6 +28,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       color: 'from-orange-500 to-orange-600',
     },
     {
+      id: 'agenda',
+      title: 'Agenda',
+      description: 'Eventos e reservas de espaços',
+      icon: Calendar,
+      color: 'from-purple-500 to-purple-600',
+    },
+    {
       id: 'cargos',
       title: 'Cargos',
       description: 'Gerenciar cargos da igreja',
@@ -47,7 +54,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {modules.map((module) => {
           const Icon = module.icon;
           return (

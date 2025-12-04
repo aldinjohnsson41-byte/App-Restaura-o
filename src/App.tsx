@@ -7,8 +7,9 @@ import PessoasPage from './pages/PessoasPage';
 import MinisteriosPage from './pages/MinisteriosPage';
 import GruposFamiliaresPage from './pages/GruposFamiliaresPage';
 import CargosPage from './pages/CargosPage';
+import CalendarPage from './pages/CalendarPage';
 
-type PageType = 'home' | 'pessoas' | 'ministerios' | 'grupos' | 'cargos';
+type PageType = 'home' | 'pessoas' | 'ministerios' | 'grupos' | 'cargos' | 'agenda';
 
 function App() {
   const { user, loading } = useAuth();
@@ -31,13 +32,15 @@ function App() {
       case 'home':
         return <HomePage onNavigate={(page) => setCurrentPage(page as PageType)} />;
       case 'pessoas':
-        return <PessoasPage />;
+        return <PessoasPage onBack={() => setCurrentPage('home')} />;
       case 'ministerios':
         return <MinisteriosPage onBack={() => setCurrentPage('home')} />;
       case 'grupos':
         return <GruposFamiliaresPage onBack={() => setCurrentPage('home')} />;
       case 'cargos':
         return <CargosPage onBack={() => setCurrentPage('home')} />;
+      case 'agenda':
+        return <CalendarPage onBack={() => setCurrentPage('home')} />;
       default:
         return <HomePage onNavigate={(page) => setCurrentPage(page as PageType)} />;
     }
