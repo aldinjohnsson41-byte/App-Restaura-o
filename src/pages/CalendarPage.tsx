@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useCalendar } from '../hooks/useCalendar';
 import { EventoAgenda, ReservaEspaco, Feriado } from '../types/calendar';
