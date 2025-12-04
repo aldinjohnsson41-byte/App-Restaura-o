@@ -1,7 +1,3 @@
-CalendarPage.tsx
-7.33 KB •239 linhas
-•
-A formatação pode estar inconsistente com a fonte
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
