@@ -1,11 +1,14 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { EventoAgenda, ReservaEspaco, ConflitoDiagnostico } from '../types/calendar';
+import { ConflitoDiagnostico } from '../types/calendar';
 
 export function useCalendar() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ---------------------------------------------------
+  // 🔍 VERIFICAR CONFLITOS
+  // ---------------------------------------------------
   const verificarConflitos = useCallback(
     async (
       espaco_id: string,
@@ -17,89 +20,102 @@ export function useCalendar() {
       try {
         setError(null);
 
-        const { data: eventoConflito } = await supabase
-          .from('eventos_agenda')
-          .select('id, nome, data_evento, hora_inicio, hora_fim')
-          .eq('espaco_id', espaco_id)
-          .eq('data_evento', data)
-          .eq('status', 'confirmado')
-          .neq('id', exclude_evento_id || 'null')
-          .then((result) => {
-            if (result.data) {
-              return {
-                data: result.data.filter((e: any) => {
-                  if (!e.hora_inicio || !e.hora_fim) return false;
-                  return !(
-                    e.hora_fim <= hora_inicio ||
-                    e.hora_inicio >= hora_fim
-                  );
-                }),
-              };
-            }
-            return { data: [] };
-          });
+        // -------------------------
+        // Buscar eventos no mesmo espaço/data
+        // -------------------------
+        let query = supabase
+          .from("eventos_agenda")
+          .select("id, nome, data_evento, hora_inicio, hora_fim")
+          .eq("espaco_id", espaco_id)
+          .eq("data_evento", data)
+          .eq("status", "confirmado");
 
-        const { data: reservaConflito } = await supabase
-          .from('reservas_espacos')
-          .select('id, responsavel_nome, data_reserva, hora_inicio, hora_fim')
-          .eq('espaco_id', espaco_id)
-          .eq('data_reserva', data)
-          .eq('status', 'confirmada');
+        // Excluir o próprio evento ao EDITAR
+        if (exclude_evento_id) {
+          query = query.neq("id", exclude_evento_id);
+        }
 
-        const conflitosReserva = (reservaConflito || []).filter((r: any) => {
+        const { data: eventos, error: eventoErr } = await query;
+
+        if (eventoErr) throw eventoErr;
+
+        // Filtrar conflitos reais (intervalo se sobrepõe)
+        const eventosConflito = (eventos || []).filter((e: any) => {
+          if (!e.hora_inicio || !e.hora_fim) return false;
+
+          return !(
+            e.hora_fim <= hora_inicio || 
+            e.hora_inicio >= hora_fim
+          ); 
+        });
+
+        // -------------------------
+        // Buscar reservas no mesmo espaço/data
+        // -------------------------
+        const { data: reservas, error: reservaErr } = await supabase
+          .from("reservas_espacos")
+          .select("id, responsavel_nome, data_reserva, hora_inicio, hora_fim")
+          .eq("espaco_id", espaco_id)
+          .eq("data_reserva", data)
+          .eq("status", "confirmada");
+
+        if (reservaErr) throw reservaErr;
+
+        const reservasConflito = (reservas || []).filter((r: any) => {
           return !(r.hora_fim <= hora_inicio || r.hora_inicio >= hora_fim);
         });
 
-        const temConflito = (eventoConflito && eventoConflito.length > 0) ||
-          (conflitosReserva && conflitosReserva.length > 0);
+        const existe = eventosConflito.length > 0 || reservasConflito.length > 0;
 
         return {
-          existe: temConflito,
-          tipo: temConflito ? 'horario' : 'nenhum',
-          mensagem: temConflito
-            ? 'Existe um conflito de horário com outro evento ou reserva'
-            : 'Sem conflitos',
+          existe,
+          tipo: existe ? "horario" : "nenhum",
+          mensagem: existe
+            ? "Existe um conflito de horário com outro evento ou reserva"
+            : "Sem conflitos",
           conflitos: [
-            ...(eventoConflito?.map((e: any) => ({
+            ...eventosConflito.map((e: any) => ({
               evento_id: e.id,
               nome: e.nome,
               data: e.data_evento,
               hora_inicio: e.hora_inicio,
-              hora_fim: e.hora_fim,
-            })) || []),
-            ...(conflitosReserva?.map((r: any) => ({
+              hora_fim: e.hora_fim
+            })),
+            ...reservasConflito.map((r: any) => ({
               reserva_id: r.id,
               nome: r.responsavel_nome,
               data: r.data_reserva,
               hora_inicio: r.hora_inicio,
-              hora_fim: r.hora_fim,
-            })) || []),
-          ],
+              hora_fim: r.hora_fim
+            })),
+          ]
         };
       } catch (err: any) {
         setError(err.message);
         return {
           existe: false,
-          tipo: 'nenhum',
-          mensagem: 'Erro ao verificar conflitos',
-          conflitos: [],
+          tipo: "nenhum",
+          mensagem: "Erro ao verificar conflitos",
+          conflitos: []
         };
       }
     },
     []
   );
 
+  // ---------------------------------------------------
+  // 🟩 CRIAR EVENTO
+  // ---------------------------------------------------
   const criarEvento = useCallback(
     async (eventoData: any, user_id: string) => {
       try {
         setLoading(true);
         setError(null);
 
-        console.log('📝 Criando evento:', eventoData);
+        console.log("📝 Criando evento:", eventoData);
 
-        // ✅ 1. Criar o evento primeiro
         const { data: novoEvento, error: insertError } = await supabase
-          .from('eventos_agenda')
+          .from("eventos_agenda")
           .insert({
             nome: eventoData.nome,
             descricao: eventoData.descricao,
@@ -112,45 +128,28 @@ export function useCalendar() {
             local: eventoData.local,
             endereco_completo: eventoData.endereco_completo,
             espaco_id: eventoData.espaco_id,
-            status: eventoData.status || 'confirmado',
+            status: eventoData.status || "confirmado",
             observacoes: eventoData.observacoes,
-            criado_por: user_id,
+            criado_por: user_id
           })
           .select()
           .single();
 
-        if (insertError) {
-          console.error('❌ Erro ao criar evento:', insertError);
-          throw insertError;
-        }
+        if (insertError) throw insertError;
 
-        console.log('✅ Evento criado:', novoEvento);
-
-        // ✅ 2. Adicionar participantes se houver
-        if (eventoData.participantes_ids && eventoData.participantes_ids.length > 0) {
-          console.log('👥 Adicionando participantes:', eventoData.participantes_ids);
-
-          const participantes = eventoData.participantes_ids.map((pessoa_id: string) => ({
+        // Adicionar participantes
+        if (eventoData.participantes_ids?.length > 0) {
+          const participantes = eventoData.participantes_ids.map((id: string) => ({
             evento_id: novoEvento.id,
-            pessoa_id: pessoa_id,
-            confirmacao_presenca: 'pendente',
+            pessoa_id: id,
+            confirmacao_presenca: "pendente"
           }));
 
-          const { error: participantesError } = await supabase
-            .from('evento_participantes')
-            .insert(participantes);
-
-          if (participantesError) {
-            console.error('❌ Erro ao adicionar participantes:', participantesError);
-            // ⚠️ Não falha toda a operação se só os participantes falharem
-          } else {
-            console.log('✅ Participantes adicionados com sucesso');
-          }
+          await supabase.from("evento_participantes").insert(participantes);
         }
 
         return novoEvento;
       } catch (err: any) {
-        console.error('❌ Erro geral:', err);
         setError(err.message);
         throw err;
       } finally {
@@ -160,17 +159,19 @@ export function useCalendar() {
     []
   );
 
+  // ---------------------------------------------------
+  // ✏️ ATUALIZAR EVENTO
+  // ---------------------------------------------------
   const atualizarEvento = useCallback(
     async (evento_id: string, eventoData: any) => {
       try {
         setLoading(true);
         setError(null);
 
-        console.log('✏️ Atualizando evento:', evento_id, eventoData);
+        console.log("✏️ Atualizando evento:", evento_id, eventoData);
 
-        // ✅ 1. Atualizar o evento
         const { data: eventoAtualizado, error: updateError } = await supabase
-          .from('eventos_agenda')
+          .from("eventos_agenda")
           .update({
             nome: eventoData.nome,
             descricao: eventoData.descricao,
@@ -184,52 +185,31 @@ export function useCalendar() {
             endereco_completo: eventoData.endereco_completo,
             espaco_id: eventoData.espaco_id,
             status: eventoData.status,
-            observacoes: eventoData.observacoes,
+            observacoes: eventoData.observacoes
           })
-          .eq('id', evento_id)
+          .eq("id", evento_id)
           .select()
           .single();
 
-        if (updateError) {
-          console.error('❌ Erro ao atualizar evento:', updateError);
-          throw updateError;
-        }
+        if (updateError) throw updateError;
 
-        console.log('✅ Evento atualizado:', eventoAtualizado);
-
-        // ✅ 2. Atualizar participantes se fornecido
+        // Atualizar participantes se enviados
         if (eventoData.participantes_ids !== undefined) {
-          console.log('👥 Atualizando participantes...');
+          await supabase.from("evento_participantes").delete().eq("evento_id", evento_id);
 
-          // Deletar participantes antigos
-          await supabase
-            .from('evento_participantes')
-            .delete()
-            .eq('evento_id', evento_id);
-
-          // Adicionar novos participantes
           if (eventoData.participantes_ids.length > 0) {
-            const participantes = eventoData.participantes_ids.map((pessoa_id: string) => ({
-              evento_id: evento_id,
-              pessoa_id: pessoa_id,
-              confirmacao_presenca: 'pendente',
+            const novos = eventoData.participantes_ids.map((id: string) => ({
+              evento_id,
+              pessoa_id: id,
+              confirmacao_presenca: "pendente"
             }));
 
-            const { error: participantesError } = await supabase
-              .from('evento_participantes')
-              .insert(participantes);
-
-            if (participantesError) {
-              console.error('❌ Erro ao atualizar participantes:', participantesError);
-            } else {
-              console.log('✅ Participantes atualizados com sucesso');
-            }
+            await supabase.from("evento_participantes").insert(novos);
           }
         }
 
         return eventoAtualizado;
       } catch (err: any) {
-        console.error('❌ Erro geral:', err);
         setError(err.message);
         throw err;
       } finally {
@@ -239,23 +219,21 @@ export function useCalendar() {
     []
   );
 
+  // ---------------------------------------------------
+  // 🗑️ DELETAR EVENTO
+  // ---------------------------------------------------
   const deletarEvento = useCallback(async (evento_id: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      console.log('🗑️ Deletando evento:', evento_id);
-
       const { error } = await supabase
-        .from('eventos_agenda')
+        .from("eventos_agenda")
         .delete()
-        .eq('id', evento_id);
+        .eq("id", evento_id);
 
       if (error) throw error;
-
-      console.log('✅ Evento deletado com sucesso');
     } catch (err: any) {
-      console.error('❌ Erro ao deletar:', err);
       setError(err.message);
       throw err;
     } finally {
@@ -263,6 +241,9 @@ export function useCalendar() {
     }
   }, []);
 
+  // ---------------------------------------------------
+  // 🟦 CRIAR RESERVA
+  // ---------------------------------------------------
   const criarReserva = useCallback(
     async (reservaData: any, user_id: string) => {
       try {
@@ -277,15 +258,15 @@ export function useCalendar() {
         );
 
         if (conflitos.existe) {
-          throw new Error('Existe um conflito de horário. Verifique a disponibilidade.');
+          throw new Error("Existe um conflito de horário. Verifique a disponibilidade.");
         }
 
         const { data, error: insertError } = await supabase
-          .from('reservas_espacos')
+          .from("reservas_espacos")
           .insert({
             ...reservaData,
             criado_por: user_id,
-            status: 'confirmada',
+            status: "confirmada"
           })
           .select()
           .single();
@@ -302,6 +283,7 @@ export function useCalendar() {
     [verificarConflitos]
   );
 
+  // Expor funções
   return {
     loading,
     error,
@@ -310,6 +292,6 @@ export function useCalendar() {
     criarEvento,
     atualizarEvento,
     deletarEvento,
-    criarReserva,
+    criarReserva
   };
 }
