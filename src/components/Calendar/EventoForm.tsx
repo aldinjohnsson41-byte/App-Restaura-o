@@ -1,21 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Plus, Trash2, MapPin, Users, Calendar } from 'lucide-react';
 
-// Simulação do Supabase (em produção, use o import real)
-const supabase = {
-  from: (table) => ({
-    select: (fields) => ({
-      eq: (field, value) => ({
-        order: (orderField) => Promise.resolve({ data: [] })
-      })
-    }),
-    insert: (data) => Promise.resolve({ data: null, error: null }),
-    update: (data) => ({
-      eq: (field, value) => Promise.resolve({ data: null, error: null })
-    })
-  })
-};
-
 export default function EventoFormMelhorado() {
   const [espacos, setEspacos] = useState([]);
   const [pessoas, setPessoas] = useState([]);
@@ -65,6 +50,7 @@ export default function EventoFormMelhorado() {
   const handleAdicionarParticipante = (pessoa) => {
     if (formData.participantes.find(p => p.id === pessoa.id)) {
       setError('Esta pessoa já foi adicionada');
+      setTimeout(() => setError(''), 3000);
       return;
     }
 
@@ -91,6 +77,7 @@ export default function EventoFormMelhorado() {
   const handleLocalizarMapa = () => {
     if (!formData.endereco_completo) {
       setError('Digite o endereço completo para localizar no mapa');
+      setTimeout(() => setError(''), 3000);
       return;
     }
 
@@ -100,8 +87,7 @@ export default function EventoFormMelhorado() {
     setShowMap(true);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setError('');
 
     if (!formData.nome.trim()) {
@@ -170,7 +156,7 @@ export default function EventoFormMelhorado() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="max-w-5xl mx-auto p-6 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-bold text-slate-900">
@@ -179,17 +165,17 @@ export default function EventoFormMelhorado() {
         </div>
 
         {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3">
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3 animate-pulse">
             <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
             <div>{error}</div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-6">
           {/* Informações Básicas */}
           <div className="space-y-4">
             <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
+              <Calendar className="w-5 h-5 text-blue-600" />
               Informações Básicas
             </h4>
             
@@ -317,7 +303,7 @@ export default function EventoFormMelhorado() {
           {/* Local e Espaço */}
           <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-              <MapPin className="w-5 h-5" />
+              <MapPin className="w-5 h-5 text-green-600" />
               Local e Espaço
             </h4>
 
@@ -379,7 +365,7 @@ export default function EventoFormMelhorado() {
           {/* Participantes */}
           <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-              <Users className="w-5 h-5" />
+              <Users className="w-5 h-5 text-purple-600" />
               Participantes ({formData.participantes.length})
             </h4>
 
@@ -478,7 +464,8 @@ export default function EventoFormMelhorado() {
               Cancelar
             </button>
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               disabled={submitting}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-2"
             >
@@ -486,7 +473,7 @@ export default function EventoFormMelhorado() {
               {submitting ? 'Salvando...' : 'Salvar Evento'}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
