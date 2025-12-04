@@ -188,6 +188,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
       setSubmitting(true);
 
       const payload = {
+        id: evento?.id || null,   // 👈 ESSA LINHA É O QUE FALTAVA!
         nome: formData.nome,
         descricao: formData.descricao,
         data_evento: formData.data_inicio,
@@ -202,6 +203,7 @@ export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, load
         observacoes: formData.observacoes,
         participantes_ids: formData.participantes.map((p: any) => p.id)
       };
+
 
       await onSalvar(payload);
       
