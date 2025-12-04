@@ -1,39 +1,66 @@
 import { useState, useEffect } from 'react';
-import { X, Save, AlertCircle, Plus, Trash2, MapPin, Users, Calendar } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { X, Save, AlertCircle, Plus, Trash2, MapPin, Users, Calendar, Clock } from 'lucide-react';
 
-/**
- * EventoForm.tsx â€” VersÃ£o completa e funcional
- * - Removeu o mock e usa supabase real
- * - Busca dinÃ¢mica de pessoas com .or(...).ilike
- * - Carrega espaÃ§os fÃ­sicos
- * - Insere evento em 'eventos_agenda' (altere caso necessÃ¡rio)
- * - Mantive a UI e comportamento original
- */
+// Mock do supabase para demonstraÃ§Ã£o
+const mockSupabase = {
+  from: (table: string) => ({
+    select: (fields: string) => ({
+      eq: (col: string, val: any) => ({
+        order: (field: string) => ({
+          data: [
+            { id: '1', nome: 'SalÃ£o Principal', capacidade: 200, localizacao: 'TÃ©rreo' },
+            { id: '2', nome: 'AuditÃ³rio', capacidade: 100, localizacao: '1Âº Andar' }
+          ],
+          error: null
+        })
+      }),
+      or: (query: string) => ({
+        order: (field: string) => ({
+          limit: (n: number) => ({
+            data: [
+              { id: '1', nome_completo: 'JoÃ£o Silva', email: 'joao@email.com', telefone: '(11) 99999-9999' },
+              { id: '2', nome_completo: 'Maria Santos', email: 'maria@email.com', telefone: '(11) 98888-8888' }
+            ],
+            error: null
+          })
+        })
+      })
+    }),
+    insert: (data: any) => ({ data: null, error: null }),
+    update: (data: any) => ({
+      eq: (col: string, val: any) => ({ data: null, error: null })
+    })
+  })
+};
 
-export default function EventoFormMelhorado() {
+interface EventoFormProps {
+  evento?: any;
+  onSalvar: (data: any) => void;
+  onCancelar: () => void;
+  loading?: boolean;
+}
+
+export default function EventoFormMelhorado({ evento, onSalvar, onCancelar, loading }: EventoFormProps) {
   const [espacos, setEspacos] = useState<any[]>([]);
   const [pessoas, setPessoas] = useState<any[]>([]);
   const [error, setError] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [searchPessoa, setSearchPessoa] = useState<string>('');
-  const [loadingPessoas, setLoadingPessoas] = useState<boolean>(false);
 
   const [formData, setFormData] = useState<any>({
-    nome: '',
-    descricao: '',
-    data_inicio: new Date().toISOString().split('T')[0],
-    data_fim: new Date().toISOString().split('T')[0],
-    hora_inicio: '09:00',
-    hora_fim: '10:00',
-    dia_inteiro: false,
-    multiplos_dias: false,
-    local: '',
-    endereco_completo: '',
-    espaco_id: '',
-    status: 'confirmado',
-    observacoes: '',
-    participantes: []
+    nome: evento?.nome || '',
+    descricao: evento?.descricao || '',
+    data_inicio: evento?.data_evento || new Date().toISOString().split('T')[0],
+    data_fim: evento?.data_fim || new Date().toISOString().split('T')[0],
+    hora_inicio: evento?.hora_inicio || '09:00',
+    hora_fim: evento?.hora_fim || '10:00',
+    dia_inteiro: evento?.dia_inteiro || false,
+    multiplos_dias: evento?.multiplos_dias || false,
+    endereco_completo: evento?.endereco_completo || '',
+    espaco_id: evento?.espaco_id || '',
+    status: evento?.status || 'confirmado',
+    observacoes: evento?.observacoes || '',
+    participantes: evento?.participantes || []
   });
 
   useEffect(() => {
@@ -42,17 +69,15 @@ export default function EventoFormMelhorado() {
 
   useEffect(() => {
     if (searchPessoa.length >= 2) {
-      const t = searchPessoa.trim();
-      buscarPessoas(t);
+      buscarPessoas(searchPessoa.trim());
     } else {
       setPessoas([]);
     }
   }, [searchPessoa]);
 
-  // Load espacos fÃ­sicos
   const carregarEspacos = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await mockSupabase
         .from('espacos_fisicos')
         .select('*')
         .eq('ativo', true)
@@ -65,7 +90,6 @@ export default function EventoFormMelhorado() {
     }
   };
 
-  // Buscar pessoas com OR ilike (nome ou email)
   const buscarPessoas = async (termo: string) => {
     if (!termo || termo.length < 2) {
       setPessoas([]);
@@ -73,9 +97,7 @@ export default function EventoFormMelhorado() {
     }
 
     try {
-      setLoadingPessoas(true);
-
-      const { data, error } = await supabase
+      const { data, error } = await mockSupabase
         .from('pessoas')
         .select('id, nome_completo, email, telefone, whatsapp')
         .or(`nome_completo.ilike.%${termo}%,email.ilike.%${termo}%`)
@@ -87,8 +109,6 @@ export default function EventoFormMelhorado() {
     } catch (err) {
       console.error('Erro ao buscar pessoas:', err);
       setPessoas([]);
-    } finally {
-      setLoadingPessoas(false);
     }
   };
 
@@ -136,82 +156,65 @@ export default function EventoFormMelhorado() {
     window.open(mapUrl, '_blank');
   };
 
-  const handleSubmit = async () => {
-      setError('');
-    
-      if (!formData.nome.trim()) {
-        setError('Nome do evento Ã© obrigatÃ³rio');
-        return;
-      }
-    
-      if (formData.multiplos_dias && formData.data_inicio > formData.data_fim) {
-        setError('Data de inÃ­cio deve ser anterior Ã  data de fim');
-        return;
-      }
-    
-      if (!formData.dia_inteiro && formData.hora_inicio >= formData.hora_fim) {
-        setError('HorÃ¡rio de inÃ­cio deve ser anterior ao horÃ¡rio de fim');
-        return;
-      }
-    
-      try {
-        setSubmitting(true);
-    
-        // PREPARA PAYLOAD EXATAMENTE COMO O BANCO ESPERA
-        const payload = {
-          nome: formData.nome,
-          descricao: formData.descricao,
-          data_evento: formData.data_inicio,
-          data_fim: formData.multiplos_dias ? formData.data_fim : formData.data_inicio,
-          hora_inicio: formData.dia_inteiro ? null : formData.hora_inicio,
-          hora_fim: formData.dia_inteiro ? null : formData.hora_fim,
-          dia_inteiro: formData.dia_inteiro,
-          multiplos_dias: formData.multiplos_dias,
-          local: formData.local,
-          endereco_completo: formData.endereco_completo,
-          espaco_id: formData.espaco_id || null,
-          status: formData.status,
-          observacoes: formData.observacoes,
-          participantes_ids: formData.participantes.map((p: any) => p.id),
-          sincronizado_google: false,
-          google_calendar_id: null,
-          criado_por: null   // ðŸ‘ˆ necessÃ¡rio se a coluna permitir NULL
-        };
-    
-        const { error } = await supabase
-          .from('eventos_agenda')
-          .insert(payload);
-    
-        if (error) throw error;
-    
-        alert('Evento salvo com sucesso!');
-    
-        // Reset form
-        setFormData({
-          nome: '',
-          descricao: '',
-          data_inicio: new Date().toISOString().split('T')[0],
-          data_fim: new Date().toISOString().split('T')[0],
-          hora_inicio: '09:00',
-          hora_fim: '10:00',
-          dia_inteiro: false,
-          multiplos_dias: false,
-          local: '',
-          endereco_completo: '',
-          espaco_id: '',
-          status: 'confirmado',
-          observacoes: '',
-          participantes: []
-        });
-    
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message || 'Erro ao salvar evento');
-      } finally {
-        setSubmitting(false);
-      }
-    };
+  const validarConflitosHorarios = () => {
+    if (formData.dia_inteiro) return true;
 
+    if (formData.hora_inicio >= formData.hora_fim) {
+      setError('HorÃ¡rio de inÃ­cio deve ser anterior ao horÃ¡rio de fim');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    setError('');
+
+    if (!formData.nome.trim()) {
+      setError('Nome do evento Ã© obrigatÃ³rio');
+      return;
+    }
+
+    if (formData.multiplos_dias && formData.data_inicio > formData.data_fim) {
+      setError('Data de inÃ­cio deve ser anterior Ã  data de fim');
+      return;
+    }
+
+    if (!validarConflitosHorarios()) {
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      const payload = {
+        nome: formData.nome,
+        descricao: formData.descricao,
+        data_evento: formData.data_inicio,
+        data_fim: formData.multiplos_dias ? formData.data_fim : formData.data_inicio,
+        hora_inicio: formData.dia_inteiro ? null : formData.hora_inicio,
+        hora_fim: formData.dia_inteiro ? null : formData.hora_fim,
+        dia_inteiro: formData.dia_inteiro,
+        multiplos_dias: formData.multiplos_dias,
+        endereco_completo: formData.endereco_completo,
+        espaco_id: formData.espaco_id || null,
+        status: formData.status,
+        observacoes: formData.observacoes,
+        participantes_ids: formData.participantes.map((p: any) => p.id)
+      };
+
+      await onSalvar(payload);
+      
+      alert('Evento salvo com sucesso!');
+      onCancelar();
+
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Erro ao salvar evento');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const pessoasFiltradas = pessoas.filter((p) =>
     (p.nome_completo || '').toLowerCase().includes(searchPessoa.toLowerCase()) ||
@@ -227,16 +230,22 @@ export default function EventoFormMelhorado() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-bold text-slate-900">
-            Novo Evento
+            {evento ? 'Editar Evento' : 'Novo Evento'}
           </h3>
+          <button
+            onClick={onCancelar}
+            className="p-2 hover:bg-slate-100 rounded-lg transition"
+          >
+            <X className="w-5 h-5 text-slate-700" />
+          </button>
         </div>
 
         {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3 animate-pulse">
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
             <div>{error}</div>
           </div>
@@ -245,7 +254,7 @@ export default function EventoFormMelhorado() {
         <div className="space-y-6">
           {/* InformaÃ§Ãµes BÃ¡sicas */}
           <div className="space-y-4">
-            <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+            <h4 className="font-semibold text-slate-900 flex items-center gap-2 text-lg border-b pb-2">
               <Calendar className="w-5 h-5 text-blue-600" />
               InformaÃ§Ãµes BÃ¡sicas
             </h4>
@@ -280,7 +289,10 @@ export default function EventoFormMelhorado() {
 
           {/* Datas e HorÃ¡rios */}
           <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-            <h4 className="font-semibold text-slate-900">Datas e HorÃ¡rios</h4>
+            <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-blue-600" />
+              Datas e HorÃ¡rios
+            </h4>
 
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -288,7 +300,7 @@ export default function EventoFormMelhorado() {
                   type="checkbox"
                   checked={formData.dia_inteiro}
                   onChange={(e) => setFormData({ ...formData, dia_inteiro: e.target.checked })}
-                  className="w-4 h-4 border border-slate-300 rounded"
+                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                 />
                 <span className="text-sm font-medium text-slate-700">Dia inteiro</span>
               </label>
@@ -298,7 +310,7 @@ export default function EventoFormMelhorado() {
                   type="checkbox"
                   checked={formData.multiplos_dias}
                   onChange={(e) => setFormData({ ...formData, multiplos_dias: e.target.checked })}
-                  className="w-4 h-4 border border-slate-300 rounded"
+                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                 />
                 <span className="text-sm font-medium text-slate-700">MÃºltiplos dias</span>
               </label>
@@ -335,7 +347,7 @@ export default function EventoFormMelhorado() {
             </div>
 
             {formData.multiplos_dias && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm font-medium">
                 <strong>DuraÃ§Ã£o:</strong> {calcularDiasEvento()} dias
               </div>
             )}
@@ -398,19 +410,6 @@ export default function EventoFormMelhorado() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Local (descriÃ§Ã£o)
-              </label>
-              <input
-                type="text"
-                value={formData.local}
-                onChange={(e) => setFormData({ ...formData, local: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Ex: SalÃ£o Principal, AuditÃ³rio..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
                 EndereÃ§o Completo
               </label>
               <div className="flex gap-2">
@@ -427,7 +426,7 @@ export default function EventoFormMelhorado() {
                   className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition flex items-center gap-2"
                 >
                   <MapPin className="w-4 h-4" />
-                  Ver Mapa
+                  Mapa
                 </button>
               </div>
             </div>
@@ -449,11 +448,8 @@ export default function EventoFormMelhorado() {
                 value={searchPessoa}
                 onChange={(e) => setSearchPessoa(e.target.value)}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Digite pelo menos 2 caracteres para buscar..."
+                placeholder="Digite pelo menos 2 caracteres..."
               />
-              {loadingPessoas && (
-                <p className="text-sm text-slate-500 mt-2">Buscando...</p>
-              )}
             </div>
 
             {searchPessoa.length >= 2 && pessoasFiltradas.length > 0 && (
@@ -476,9 +472,6 @@ export default function EventoFormMelhorado() {
                         <div>
                           <div className="font-medium text-slate-900">{pessoa.nome_completo}</div>
                           <div className="text-sm text-slate-600">{pessoa.email}</div>
-                          {pessoa.telefone && (
-                            <div className="text-xs text-slate-500">{pessoa.telefone}</div>
-                          )}
                         </div>
                         {jaAdicionado && (
                           <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
@@ -489,18 +482,6 @@ export default function EventoFormMelhorado() {
                     </button>
                   );
                 })}
-              </div>
-            )}
-
-            {searchPessoa.length >= 2 && !loadingPessoas && pessoasFiltradas.length === 0 && (
-              <div className="p-4 text-center text-slate-500 text-sm bg-slate-50 rounded-lg border border-slate-200">
-                Nenhuma pessoa encontrada
-              </div>
-            )}
-
-            {searchPessoa.length > 0 && searchPessoa.length < 2 && (
-              <div className="p-2 text-xs text-slate-500">
-                Digite pelo menos 2 caracteres para buscar
               </div>
             )}
 
@@ -564,7 +545,7 @@ export default function EventoFormMelhorado() {
           <div className="flex gap-3 justify-end pt-6 border-t border-slate-200">
             <button
               type="button"
-              onClick={() => window.history.back()}
+              onClick={onCancelar}
               className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
             >
               Cancelar
@@ -572,11 +553,11 @@ export default function EventoFormMelhorado() {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || loading}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
-              {submitting ? 'Salvando...' : 'Salvar Evento'}
+              {submitting || loading ? 'Salvando...' : 'Salvar Evento'}
             </button>
           </div>
         </div>
