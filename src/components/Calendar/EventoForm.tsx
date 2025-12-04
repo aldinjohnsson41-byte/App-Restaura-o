@@ -1,6 +1,44 @@
 import { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Plus, Trash2, MapPin, Users, Calendar } from 'lucide-react';
 
+// IMPORTANTE: Em produção, substitua pela importação real:
+// import { supabase } from '../../lib/supabase';
+
+// Em produção, importe o supabase real:
+// import { supabase } from '../../lib/supabase';
+
+// Simulação para demonstração (remova em produção)
+const supabase = {
+  from: (table) => ({
+    select: (fields) => ({
+      eq: (field, value) => ({
+        order: (orderField) => Promise.resolve({ 
+          data: table === 'espacos_fisicos' ? [
+            { id: '1', nome: 'Salão Principal', capacidade: 200, localizacao: 'Térreo' },
+            { id: '2', nome: 'Sala de Reuniões', capacidade: 30, localizacao: '1º Andar' },
+            { id: '3', nome: 'Auditório', capacidade: 150, localizacao: '2º Andar' }
+          ] : []
+        })
+      }),
+      order: (orderField) => ({
+        limit: (num) => Promise.resolve({ 
+          data: table === 'pessoas' ? [
+            { id: '1', nome_completo: 'João Silva', email: 'joao@email.com', telefone: '(11) 99999-0001' },
+            { id: '2', nome_completo: 'Maria Santos', email: 'maria@email.com', telefone: '(11) 99999-0002' },
+            { id: '3', nome_completo: 'Pedro Oliveira', email: 'pedro@email.com', telefone: '(11) 99999-0003' },
+            { id: '4', nome_completo: 'Ana Costa', email: 'ana@email.com', telefone: '(11) 99999-0004' }
+          ] : []
+        })
+      }),
+      ilike: (field, value) => ({
+        order: (orderField) => ({
+          limit: (num) => Promise.resolve({ data: [] })
+        })
+      })
+    })
+  })
+};
+
 export default function EventoFormMelhorado() {
   const [espacos, setEspacos] = useState([]);
   const [pessoas, setPessoas] = useState([]);
@@ -8,6 +46,7 @@ export default function EventoFormMelhorado() {
   const [submitting, setSubmitting] = useState(false);
   const [searchPessoa, setSearchPessoa] = useState('');
   const [showMap, setShowMap] = useState(false);
+  const [loadingPessoas, setLoadingPessoas] = useState(false);
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -27,24 +66,60 @@ export default function EventoFormMelhorado() {
   });
 
   useEffect(() => {
-    carregarDados();
+    carregarEspacos();
   }, []);
 
-  const carregarDados = async () => {
-    // Simular carregamento de espaços
-    setEspacos([
-      { id: '1', nome: 'Salão Principal', capacidade: 200, localizacao: 'Térreo' },
-      { id: '2', nome: 'Sala de Reuniões', capacidade: 30, localizacao: '1º Andar' },
-      { id: '3', nome: 'Auditório', capacidade: 150, localizacao: '2º Andar' }
-    ]);
+  useEffect(() => {
+    if (searchPessoa.length >= 2) {
+      buscarPessoas(searchPessoa);
+    } else {
+      setPessoas([]);
+    }
+  }, [searchPessoa]);
 
-    // Simular carregamento de pessoas
-    setPessoas([
-      { id: '1', nome_completo: 'João Silva', email: 'joao@email.com', telefone: '(11) 99999-0001' },
-      { id: '2', nome_completo: 'Maria Santos', email: 'maria@email.com', telefone: '(11) 99999-0002' },
-      { id: '3', nome_completo: 'Pedro Oliveira', email: 'pedro@email.com', telefone: '(11) 99999-0003' },
-      { id: '4', nome_completo: 'Ana Costa', email: 'ana@email.com', telefone: '(11) 99999-0004' }
-    ]);
+  const carregarEspacos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('espacos_fisicos')
+        .select('*')
+        .eq('ativo', true)
+        .order('nome');
+
+      if (data && !error) {
+        setEspacos(data);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar espaços:', err);
+    }
+  };
+
+  const buscarPessoas = async (termo) => {
+    if (!termo || termo.length < 2) {
+      setPessoas([]);
+      return;
+    }
+
+    try {
+      setLoadingPessoas(true);
+      
+      const { data, error } = await supabase
+        .from('pessoas')
+        .select('id, nome_completo, email, telefone, whatsapp')
+        .or(`nome_completo.ilike.%${termo}%,email.ilike.%${termo}%`)
+        .order('nome_completo')
+        .limit(20);
+
+      if (data && !error) {
+        setPessoas(data);
+      } else {
+        setPessoas([]);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar pessoas:', err);
+      setPessoas([]);
+    } finally {
+      setLoadingPessoas(false);
+    }
   };
 
   const handleAdicionarParticipante = (pessoa) => {
@@ -59,12 +134,13 @@ export default function EventoFormMelhorado() {
       participantes: [...formData.participantes, {
         id: pessoa.id,
         nome_completo: pessoa.nome_completo,
-        email: pessoa.email,
-        telefone: pessoa.telefone,
+        email: pessoa.email || '',
+        telefone: pessoa.telefone || pessoa.whatsapp || '',
         confirmacao: 'pendente'
       }]
     });
-    setSearchPessoa('');
+    setSearchPessoa(''); // Limpa o campo de busca
+    setPessoas([]); // Limpa os resultados
   };
 
   const handleRemoverParticipante = (pessoaId) => {
@@ -108,8 +184,19 @@ export default function EventoFormMelhorado() {
     try {
       setSubmitting(true);
       
-      // Aqui você salvaria no banco de dados
-      console.log('Salvando evento:', formData);
+      // Preparar dados para salvar
+      const eventoData = {
+        ...formData,
+        // Se multiplos_dias for false, usa data_inicio como data_evento
+        data_evento: formData.data_inicio,
+        // Array de IDs dos participantes
+        participantes_ids: formData.participantes.map(p => p.id)
+      };
+      
+      console.log('Salvando evento:', eventoData);
+      
+      // AQUI VOCÊ DEVE CHAMAR SUA FUNÇÃO DE SALVAR:
+      // await criarEvento(eventoData, user.id);
       
       // Simular salvamento
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -378,23 +465,58 @@ export default function EventoFormMelhorado() {
                 value={searchPessoa}
                 onChange={(e) => setSearchPessoa(e.target.value)}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Digite o nome ou email..."
+                placeholder="Digite pelo menos 2 caracteres para buscar..."
               />
+              {loadingPessoas && (
+                <p className="text-sm text-slate-500 mt-2">Buscando...</p>
+              )}
             </div>
 
-            {searchPessoa && pessoasFiltradas.length > 0 && (
-              <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg bg-white">
-                {pessoasFiltradas.map((pessoa) => (
-                  <button
-                    key={pessoa.id}
-                    type="button"
-                    onClick={() => handleAdicionarParticipante(pessoa)}
-                    className="w-full text-left px-4 py-3 hover:bg-blue-50 transition border-b border-slate-200 last:border-b-0"
-                  >
-                    <div className="font-medium text-slate-900">{pessoa.nome_completo}</div>
-                    <div className="text-sm text-slate-600">{pessoa.email}</div>
-                  </button>
-                ))}
+            {searchPessoa.length >= 2 && pessoas.length > 0 && (
+              <div className="max-h-48 overflow-y-auto border border-slate-300 rounded-lg bg-white shadow-lg">
+                {pessoas.map((pessoa) => {
+                  const jaAdicionado = formData.participantes.find(p => p.id === pessoa.id);
+                  return (
+                    <button
+                      key={pessoa.id}
+                      type="button"
+                      onClick={() => handleAdicionarParticipante(pessoa)}
+                      disabled={jaAdicionado}
+                      className={`w-full text-left px-4 py-3 transition border-b border-slate-200 last:border-b-0 ${
+                        jaAdicionado 
+                          ? 'bg-slate-100 cursor-not-allowed opacity-60' 
+                          : 'hover:bg-blue-50 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-slate-900">{pessoa.nome_completo}</div>
+                          <div className="text-sm text-slate-600">{pessoa.email}</div>
+                          {pessoa.telefone && (
+                            <div className="text-xs text-slate-500">{pessoa.telefone}</div>
+                          )}
+                        </div>
+                        {jaAdicionado && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                            Adicionado
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {searchPessoa.length >= 2 && !loadingPessoas && pessoas.length === 0 && (
+              <div className="p-4 text-center text-slate-500 text-sm bg-slate-50 rounded-lg border border-slate-200">
+                Nenhuma pessoa encontrada
+              </div>
+            )}
+
+            {searchPessoa.length > 0 && searchPessoa.length < 2 && (
+              <div className="p-2 text-xs text-slate-500">
+                Digite pelo menos 2 caracteres para buscar
               </div>
             )}
 
