@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Plus, Trash2, MapPin, Users, Calendar, Clock } from 'lucide-react';
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../lib/supabase";
 
 interface EventoFormProps {
   evento?: any;
