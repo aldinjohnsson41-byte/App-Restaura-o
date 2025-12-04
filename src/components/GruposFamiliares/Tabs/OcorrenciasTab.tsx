@@ -29,9 +29,9 @@ interface OcorrenciaForm {
 }
 
 export default function OcorrenciasTab({
-  ocorrencias,
-  membros,
-  pessoas,
+  ocorrencias = [],
+  membros = [],
+  pessoas = [],
   onAdd,
   onDelete
 }: OcorrenciasTabProps) {
