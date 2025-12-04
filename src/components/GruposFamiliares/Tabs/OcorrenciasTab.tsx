@@ -2,14 +2,30 @@
 import React, { useState } from 'react';
 import { Trash2, Calendar, User } from 'lucide-react';
 import { Pessoa } from '../../../lib/supabase';
-import { Ocorrencia, OcorrenciaForm } from '../../../types/grupos';
 
 interface OcorrenciasTabProps {
-  ocorrencias: Ocorrencia[];
+  ocorrencias: GrupoOcorrencia[];
   membros: Pessoa[];
   pessoas: Pessoa[];
   onAdd: (form: OcorrenciaForm) => void;
   onDelete: (id: string) => void;
+}
+
+interface GrupoOcorrencia {
+  id?: string;
+  grupo_id?: string;
+  tipo: string;
+  data_ocorrencia: string;
+  pessoa_id?: string | null;
+  descricao?: string | null;
+  created_at?: string;
+}
+
+interface OcorrenciaForm {
+  tipo: string;
+  pessoa_id: string;
+  data: string;
+  descricao: string;
 }
 
 export default function OcorrenciasTab({
@@ -42,12 +58,33 @@ export default function OcorrenciasTab({
     return pessoas.find(p => p.id === id)?.nome_completo || '—';
   };
 
+  // Tipos sugeridos
+  const tiposSugeridos = [
+    'Visita',
+    'Culto',
+    'Reunião',
+    'Aniversário',
+    'Batismo',
+    'Casamento',
+    'Óbito',
+    'Mudança',
+    'Afastamento',
+    'Retorno',
+    'Evangelismo',
+    'Estudo Bíblico',
+    'Oração',
+    'Jejum',
+    'Outros'
+  ];
+
   return (
     <div className="space-y-6">
       {/* Formulário */}
       <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-        <h4 className="font-semibold text-slate-900 mb-4">Nova Ocorrência</h4>
+        <h4 className="font-semibold text-slate-900 mb-4">Nova Ocorrência do Grupo</h4>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Tipo */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Tipo *
@@ -58,10 +95,17 @@ export default function OcorrenciasTab({
               onChange={(e) => setForm(prev => ({ ...prev, tipo: e.target.value }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
               placeholder="Ex: Visita, Culto..."
+              list="tipos-sugestoes"
               required
             />
+            <datalist id="tipos-sugestoes">
+              {tiposSugeridos.map((tipo) => (
+                <option key={tipo} value={tipo} />
+              ))}
+            </datalist>
           </div>
 
+          {/* Data */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Data *
@@ -75,6 +119,7 @@ export default function OcorrenciasTab({
             />
           </div>
 
+          {/* Membro */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Membro (opcional)
@@ -93,6 +138,7 @@ export default function OcorrenciasTab({
             </select>
           </div>
 
+          {/* Descrição + Botão */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Descrição
@@ -107,7 +153,7 @@ export default function OcorrenciasTab({
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition text-sm whitespace-nowrap"
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition text-sm whitespace-nowrap font-medium"
               >
                 Adicionar
               </button>
@@ -126,6 +172,9 @@ export default function OcorrenciasTab({
           <div className="text-center py-12 bg-slate-50 rounded-lg border border-slate-200">
             <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <p className="text-sm text-slate-500 italic">Nenhuma ocorrência registrada</p>
+            <p className="text-xs text-slate-400 mt-2">
+              Registre cultos, reuniões, visitas e outros eventos do grupo
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -138,11 +187,11 @@ export default function OcorrenciasTab({
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
-                        {ocorrencia.tipo_ocorrencia_id}
+                        {ocorrencia.tipo}
                       </span>
                       <span className="text-xs text-slate-500 flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {ocorrencia.data_ocorrencia}
+                        {new Date(ocorrencia.data_ocorrencia).toLocaleDateString('pt-BR')}
                       </span>
                     </div>
 
@@ -155,7 +204,7 @@ export default function OcorrenciasTab({
                     )}
 
                     {ocorrencia.descricao && (
-                      <div className="text-sm text-slate-700 mt-2 pl-4 border-l-2 border-slate-200">
+                      <div className="text-sm text-slate-700 mt-2 pl-4 border-l-2 border-orange-200">
                         {ocorrencia.descricao}
                       </div>
                     )}
