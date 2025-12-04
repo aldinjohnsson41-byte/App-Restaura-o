@@ -34,8 +34,7 @@ export default function EventoEdit({ evento, onClose, onSave }: EventoEditProps)
       .from("eventos")
       .update(form)
       .eq("id", evento.id)
-      .select()
-      .single();
+      .select(); // remove .single()
 
     if (error) {
       console.error(error);
