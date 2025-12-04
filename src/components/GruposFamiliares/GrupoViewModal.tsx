@@ -252,7 +252,23 @@ export default function GrupoViewModal({
     if (!grupo?.id) return;
     setLoading(true);
     try {
-      const dataHoraInicio = `${form.data_inicio}T${form.hora_inicio}:00`;
+      // Se for recorrente e não tiver data, usar uma data padrão (próxima ocorrência)
+      let dataHoraInicio;
+      if (form.eh_recorrente && !form.data_inicio) {
+        // Usar próxima ocorrência do dia da semana selecionado
+        const hoje = new Date();
+        const diaSemanaEvento = form.recorrencia_dia_semana;
+        const diaSemanaHoje = hoje.getDay();
+        let diasAte = diaSemanaEvento - diaSemanaHoje;
+        if (diasAte <= 0) diasAte += 7;
+        
+        const proximaData = new Date(hoje);
+        proximaData.setDate(hoje.getDate() + diasAte);
+        const dataStr = proximaData.toISOString().split('T')[0];
+        dataHoraInicio = `${dataStr}T${form.hora_inicio}:00`;
+      } else {
+        dataHoraInicio = `${form.data_inicio}T${form.hora_inicio}:00`;
+      }
       
       const { data, error } = await supabase
         .from('grupo_eventos')
@@ -262,7 +278,6 @@ export default function GrupoViewModal({
           tipo: form.tipo,
           descricao: form.descricao || null,
           data_inicio: dataHoraInicio,
-          duracao_minutos: form.duracao_minutos,
           local: form.local || null,
           endereco: form.endereco || null,
           eh_recorrente: form.eh_recorrente,
@@ -294,7 +309,22 @@ export default function GrupoViewModal({
     if (!grupo?.id) return;
     setLoading(true);
     try {
-      const dataHoraInicio = `${form.data_inicio}T${form.hora_inicio}:00`;
+      // Se for recorrente e não tiver data, usar uma data padrão
+      let dataHoraInicio;
+      if (form.eh_recorrente && !form.data_inicio) {
+        const hoje = new Date();
+        const diaSemanaEvento = form.recorrencia_dia_semana;
+        const diaSemanaHoje = hoje.getDay();
+        let diasAte = diaSemanaEvento - diaSemanaHoje;
+        if (diasAte <= 0) diasAte += 7;
+        
+        const proximaData = new Date(hoje);
+        proximaData.setDate(hoje.getDate() + diasAte);
+        const dataStr = proximaData.toISOString().split('T')[0];
+        dataHoraInicio = `${dataStr}T${form.hora_inicio}:00`;
+      } else {
+        dataHoraInicio = `${form.data_inicio}T${form.hora_inicio}:00`;
+      }
       
       const { data, error } = await supabase
         .from('grupo_eventos')
@@ -303,7 +333,6 @@ export default function GrupoViewModal({
           tipo: form.tipo,
           descricao: form.descricao || null,
           data_inicio: dataHoraInicio,
-          duracao_minutos: form.duracao_minutos,
           local: form.local || null,
           endereco: form.endereco || null,
           eh_recorrente: form.eh_recorrente,
