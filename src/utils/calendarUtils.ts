@@ -45,7 +45,17 @@ export function criarDiaCalendario(
   const ehMes = data.getMonth() === mesAtual;
 
   const feriado = feriados.find(f => f.data === dataString);
-  const eventosDodia = eventos.filter(e => e.data_evento === dataString);
+  const eventosDodia = eventos.filter(e => {
+  const inicio = new Date(e.data_evento);
+  const fim = new Date(e.data_fim || e.data_evento);
+  const atual = new Date(dataString);
+
+  inicio.setHours(0, 0, 0, 0);
+  fim.setHours(0, 0, 0, 0);
+
+  return atual >= inicio && atual <= fim;
+});
+
   const reservasDodia = reservas.filter(r => r.data_reserva === dataString);
 
   const hoje = new Date();
