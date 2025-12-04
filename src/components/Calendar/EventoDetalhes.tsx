@@ -43,6 +43,7 @@ export default function EventoDetalhesCompleto({
     const fim = new Date(evento.data_fim);
     const diffTime = Math.abs(fim.getTime() - inicio.getTime());
     const dias = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    const [editando, setEditando] = useState(false);
     
     return `${dias} dias`;
   };
