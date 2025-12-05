@@ -1,4 +1,3 @@
-// components/MinistryTabs/MinistryDadosTab.tsx
 import React from 'react';
 import { Ministry } from '../../types/ministryPage.types';
 import { StatusBadge } from '../StatusBadge';
@@ -61,6 +60,3 @@ export default function MinistryDadosTab({ ministry, membros }: MinistryDadosTab
     </div>
   );
 }
-
-
-
