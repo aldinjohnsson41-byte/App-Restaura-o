@@ -451,17 +451,57 @@ export default function MinisteriosPage(): JSX.Element {
   });
 
   // ============= RENDERS =============
-  // Continue no próximo artifact...
-  
   return (
     <>
-      {/* Conteúdo renderizado conforme activeView */}
       {loading && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-4 shadow-xl">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
         </div>
+      )}
+
+      {activeView === 'list' && (
+        <ListView
+          filteredMinistries={filteredMinistries}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          handleNewMinistry={handleNewMinistry}
+          handleEditMinistry={handleEditMinistry}
+          handleDeleteMinistry={handleDeleteMinistry}
+          loadMinistryDetails={loadMinistryDetails}
+        />
+      )}
+
+      {activeView === 'form' && (
+        <FormView
+          selectedMinistry={selectedMinistry}
+          formData={formData}
+          setFormData={setFormData}
+          handleSave={handleSaveMinistry}
+          handleCancel={() => setActiveView('list')}
+        />
+      )}
+
+      {activeView === 'details' && selectedMinistry && (
+        <DetailsView
+          ministry={selectedMinistry}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          membersRows={membersRows}
+          schedulesRows={schedulesRows}
+          scaleMembersRows={scaleMembersRows}
+          handleBack={() => setActiveView('list')}
+          handleEdit={() => handleEditMinistry(selectedMinistry)}
+          openAddMemberModal={openAddMemberModal}
+          openEditMemberModal={openEditMemberModal}
+          handleDeleteMember={handleDeleteMember}
+          openNewScheduleModal={openNewScheduleModal}
+          openEditScheduleModal={openEditScheduleModal}
+          handleDeleteSchedule={handleDeleteSchedule}
+        />
       )}
 
       <MemberModal
@@ -493,8 +533,6 @@ export default function MinisteriosPage(): JSX.Element {
         selectedMembers={selectedMembersForSchedule}
         toggleMember={toggleMemberSelectionForSchedule}
       />
-
-      {/* Views renderizadas no próximo artifact */}
     </>
   );
 }
