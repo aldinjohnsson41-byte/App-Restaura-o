@@ -12,6 +12,7 @@ import {
 } from './types';
 import { formatDatePtBr, StatusBadge } from './utils';
 import { MemberModal, ScheduleModal } from './Modals';
+import { ListView, FormView, DetailsView } from './Views';
 
 export default function MinisteriosPage(): JSX.Element {
   // Views
