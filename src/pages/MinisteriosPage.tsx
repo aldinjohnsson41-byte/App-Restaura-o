@@ -1,36 +1,26 @@
-// pages/MinisteriesPage.tsx
-import React, { useState, useEffect } from 'react';
-
+// pages/MinisteriosPage.tsx
+import React, { useState } from 'react';
 import { 
   Ministry, 
+  Member, 
   Schedule, 
   MinistryFormData, 
   MinistryStatus,
   ViewType,
   TabType 
 } from '../types/ministryPage.types';
-
 import { MinistryListView } from '../components/MinistryListView';
 import { MinistryFormView } from '../components/MinistryFormView';
 import { MinistryDetailsView } from '../components/MinistryDetailsView';
-
-import { mockMinistries, mockSchedules } from '../data/ministryMockData';
-
-// 🚨 Importação correta do Supabase + Tipo Pessoa
-import { supabase, Pessoa } from '../lib/supabase';
+import { mockMinistries, mockMembers, mockSchedules } from '../data/ministryMockData';
 
 export default function MinistriesPage() {
   const [activeView, setActiveView] = useState<ViewType>('list');
   const [selectedMinistry, setSelectedMinistry] = useState<Ministry | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('dados');
-
-  // Ministérios continuam mock até você pedir para conectar
+  
   const [ministries, setMinistries] = useState<Ministry[]>(mockMinistries);
-
-  // ❗ Agora os membros são pessoas REAIS do Supabase
-  const [members, setMembers] = useState<Pessoa[]>([]);
-
-  // Escalas continuam mock até você pedir para integrar
+  const [members, setMembers] = useState<Member[]>(mockMembers);
   const [schedules, setSchedules] = useState<Schedule[]>(mockSchedules);
 
   const [formData, setFormData] = useState<MinistryFormData>({
@@ -43,31 +33,7 @@ export default function MinistriesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<MinistryStatus | 'all'>('all');
 
-  // =======================================================
-  // 📌 CARREGAR PESSOAS REAIS DO SUPABASE (IGUAL GRUPO VIEW)
-  // =======================================================
-  useEffect(() => {
-    loadPessoas();
-  }, []);
-
-  const loadPessoas = async () => {
-    const { data, error } = await supabase
-      .from('pessoas')
-      .select('*')
-      .order('nome_completo', { ascending: true });
-
-    if (error) {
-      console.error("Erro ao carregar pessoas:", error);
-      return;
-    }
-
-    setMembers(data || []);
-  };
-
-  // =======================================================
-  // 📌 HANDLERS PRINCIPAIS
-  // =======================================================
-
+  // Handlers
   const handleNewMinistry = () => {
     setFormData({ nome: '', descricao: '', status: 'ativo', cor: '#3B82F6' });
     setSelectedMinistry(null);
@@ -98,11 +64,11 @@ export default function MinistriesPage() {
     }
 
     if (selectedMinistry) {
-      setMinistries(
-        ministries.map(m =>
-          m.id === selectedMinistry.id ? { ...m, ...formData } : m
-        )
-      );
+      setMinistries(ministries.map(m => 
+        m.id === selectedMinistry.id 
+          ? { ...m, ...formData }
+          : m
+      ));
     } else {
       const newMinistry: Ministry = {
         id: Date.now().toString(),
@@ -110,10 +76,8 @@ export default function MinistriesPage() {
         membros_count: 0,
         escalas_count: 0
       };
-
       setMinistries([...ministries, newMinistry]);
     }
-
     setActiveView('list');
   };
 
@@ -123,20 +87,14 @@ export default function MinistriesPage() {
     }
   };
 
-  // =======================================================
-  // 📌 FILTROS
-  // =======================================================
-
+  // Filtrar ministérios
   const filteredMinistries = ministries.filter(m => {
     const matchesSearch = m.nome.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || m.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  // =======================================================
-  // 📌 RENDERIZAÇÃO CONDICIONAL
-  // =======================================================
-
+  // Renderização condicional
   if (activeView === 'list') {
     return (
       <MinistryListView
@@ -169,7 +127,7 @@ export default function MinistriesPage() {
     return (
       <MinistryDetailsView
         ministry={selectedMinistry}
-        members={members}          // 👈 AGORA SÃO PESSOAS REAIS!
+        members={members}
         schedules={schedules}
         activeTab={activeTab}
         onTabChange={setActiveTab}
