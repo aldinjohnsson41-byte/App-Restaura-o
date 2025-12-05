@@ -1,27 +1,20 @@
-// pages/MinisteriosPage.tsx
-import React, { useState } from 'react';
-import { 
-  Ministry, 
-  Member, 
-  Schedule, 
-  MinistryFormData, 
-  MinistryStatus,
-  ViewType,
-  TabType 
-} from '../types/ministryPage.types';
-import { MinistryListView } from '../components/MinistryListView';
-import { MinistryFormView } from '../components/MinistryFormView';
-import { MinistryDetailsView } from '../components/MinistryDetailsView';
-import { mockMinistries, mockMembers, mockSchedules } from '../data/ministryMockData';
+// pages/MinistryPage.tsx
+import React, { useState, useEffect } from 'react';
+import { supabase, Pessoa } from '../lib/supabase';
+import { Ministry, MinistryFormData, ViewType } from '../types/ministryPage.types';
+import MinistryListView from '../components/MinistryListView';
+import MinistryFormView from '../components/MinistryFormView';
+import MinistryViewModal from '../components/MinistryViewModal';
 
-export default function MinistriesPage() {
-  const [activeView, setActiveView] = useState<ViewType>('list');
+export default function MinistryPage() {
+  const [view, setView] = useState<ViewType>('list');
+  const [ministries, setMinistries] = useState<Ministry[]>([]);
+  const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [selectedMinistry, setSelectedMinistry] = useState<Ministry | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('dados');
-  
-  const [ministries, setMinistries] = useState<Ministry[]>(mockMinistries);
-  const [members, setMembers] = useState<Member[]>(mockMembers);
-  const [schedules, setSchedules] = useState<Schedule[]>(mockSchedules);
+  const [viewingMinistry, setViewingMinistry] = useState<Ministry | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const [formData, setFormData] = useState<MinistryFormData>({
     nome: '',
@@ -30,14 +23,76 @@ export default function MinistriesPage() {
     cor: '#3B82F6'
   });
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<MinistryStatus | 'all'>('all');
+  useEffect(() => {
+    loadMinistries();
+    loadPessoas();
+  }, []);
 
-  // Handlers
+  const loadPessoas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('pessoas')
+        .select('*')
+        .order('nome_completo');
+
+      if (error) throw error;
+      setPessoas(data || []);
+    } catch (e) {
+      console.error('Erro ao carregar pessoas:', e);
+    }
+  };
+
+  const loadMinistries = async () => {
+    setLoading(true);
+    try {
+      const { data: ministriesData, error } = await supabase
+        .from('ministries')
+        .select('*')
+        .order('nome');
+
+      if (error) throw error;
+
+      // Carregar contagem de membros para cada ministério
+      const ministriesWithCounts = await Promise.all(
+        (ministriesData || []).map(async (ministry) => {
+          const { count: membrosCount } = await supabase
+            .from('ministry_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('ministry_id', ministry.id)
+            .eq('status', 'ativo');
+
+          const { count: escalasCount } = await supabase
+            .from('ministry_schedules')
+            .select('*', { count: 'exact', head: true })
+            .eq('ministry_id', ministry.id)
+            .gte('data_escala', new Date().toISOString().split('T')[0])
+            .neq('status', 'cancelada');
+
+          return {
+            ...ministry,
+            membros_count: membrosCount || 0,
+            escalas_count: escalasCount || 0
+          };
+        })
+      );
+
+      setMinistries(ministriesWithCounts);
+    } catch (e) {
+      console.error('Erro ao carregar ministérios:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleNewMinistry = () => {
-    setFormData({ nome: '', descricao: '', status: 'ativo', cor: '#3B82F6' });
     setSelectedMinistry(null);
-    setActiveView('form');
+    setFormData({
+      nome: '',
+      descricao: '',
+      status: 'ativo',
+      cor: '#3B82F6'
+    });
+    setView('form');
   };
 
   const handleEditMinistry = (ministry: Ministry) => {
@@ -48,94 +103,176 @@ export default function MinistriesPage() {
       status: ministry.status,
       cor: ministry.cor
     });
-    setActiveView('form');
+    setView('form');
   };
 
   const handleViewMinistry = (ministry: Ministry) => {
-    setSelectedMinistry(ministry);
-    setActiveTab('dados');
-    setActiveView('details');
+    setViewingMinistry(ministry);
   };
 
-  const handleSaveMinistry = () => {
+  const handleSaveMinistry = async () => {
     if (!formData.nome.trim()) {
-      alert('Nome do ministério é obrigatório');
+      alert('Nome é obrigatório');
       return;
     }
 
-    if (selectedMinistry) {
-      setMinistries(ministries.map(m => 
-        m.id === selectedMinistry.id 
-          ? { ...m, ...formData }
-          : m
-      ));
-    } else {
-      const newMinistry: Ministry = {
-        id: Date.now().toString(),
-        ...formData,
-        membros_count: 0,
-        escalas_count: 0
-      };
-      setMinistries([...ministries, newMinistry]);
+    setLoading(true);
+    try {
+      if (selectedMinistry) {
+        // Atualizar
+        const { data: oldData } = await supabase
+          .from('ministries')
+          .select('*')
+          .eq('id', selectedMinistry.id)
+          .single();
+
+        const { error } = await supabase
+          .from('ministries')
+          .update(formData)
+          .eq('id', selectedMinistry.id);
+
+        if (error) throw error;
+
+        // Registrar no histórico
+        await supabase.from('schedule_changes_history').insert({
+          tabela: 'ministries',
+          registro_id: selectedMinistry.id,
+          acao: 'update',
+          dados_anteriores: oldData,
+          dados_novos: { ...oldData, ...formData },
+          motivo: 'Atualização via formulário'
+        });
+      } else {
+        // Criar novo
+        const { data, error } = await supabase
+          .from('ministries')
+          .insert([formData])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Registrar no histórico
+        await supabase.from('schedule_changes_history').insert({
+          tabela: 'ministries',
+          registro_id: data.id,
+          acao: 'create',
+          dados_novos: data,
+          motivo: 'Criação via formulário'
+        });
+      }
+
+      await loadMinistries();
+      setView('list');
+    } catch (e: any) {
+      console.error('Erro ao salvar ministério:', e);
+      alert(e?.message || 'Erro ao salvar ministério');
+    } finally {
+      setLoading(false);
     }
-    setActiveView('list');
   };
 
-  const handleDeleteMinistry = (id: string) => {
-    if (confirm('Deseja realmente excluir este ministério?')) {
-      setMinistries(ministries.filter(m => m.id !== id));
+  const handleDeleteMinistry = async (id: string) => {
+    if (!confirm('Deseja realmente excluir este ministério? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Verificar se há membros
+      const { count } = await supabase
+        .from('ministry_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('ministry_id', id);
+
+      if (count && count > 0) {
+        if (
+          !confirm(
+            `Este ministério tem ${count} membro(s). Deseja realmente excluir?`
+          )
+        ) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Buscar dados antes de deletar
+      const { data: oldData } = await supabase
+        .from('ministries')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      const { error } = await supabase.from('ministries').delete().eq('id', id);
+
+      if (error) throw error;
+
+      // Registrar no histórico
+      await supabase.from('schedule_changes_history').insert({
+        tabela: 'ministries',
+        registro_id: id,
+        acao: 'delete',
+        dados_anteriores: oldData,
+        motivo: 'Exclusão via interface'
+      });
+
+      await loadMinistries();
+    } catch (e: any) {
+      console.error('Erro ao excluir ministério:', e);
+      alert(e?.message || 'Erro ao excluir ministério');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Filtrar ministérios
-  const filteredMinistries = ministries.filter(m => {
-    const matchesSearch = m.nome.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || m.status === statusFilter;
+  const filteredMinistries = ministries.filter((ministry) => {
+    const matchesSearch = ministry.nome
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === 'all' || ministry.status === statusFilter;
+
     return matchesSearch && matchesStatus;
   });
 
-  // Renderização condicional
-  if (activeView === 'list') {
-    return (
-      <MinistryListView
-        ministries={filteredMinistries}
-        searchTerm={searchTerm}
-        statusFilter={statusFilter}
-        onSearchChange={setSearchTerm}
-        onStatusFilterChange={setStatusFilter}
-        onNewMinistry={handleNewMinistry}
-        onEditMinistry={handleEditMinistry}
-        onDeleteMinistry={handleDeleteMinistry}
-        onViewMinistry={handleViewMinistry}
-      />
-    );
-  }
+  return (
+    <>
+      {view === 'list' && (
+        <MinistryListView
+          ministries={filteredMinistries}
+          searchTerm={searchTerm}
+          statusFilter={statusFilter}
+          onSearchChange={setSearchTerm}
+          onStatusFilterChange={setStatusFilter}
+          onNewMinistry={handleNewMinistry}
+          onEditMinistry={handleEditMinistry}
+          onDeleteMinistry={handleDeleteMinistry}
+          onViewMinistry={handleViewMinistry}
+        />
+      )}
 
-  if (activeView === 'form') {
-    return (
-      <MinistryFormView
-        formData={formData}
-        selectedMinistry={selectedMinistry}
-        onFormChange={setFormData}
-        onSave={handleSaveMinistry}
-        onCancel={() => setActiveView('list')}
-      />
-    );
-  }
+      {view === 'form' && (
+        <MinistryFormView
+          formData={formData}
+          selectedMinistry={selectedMinistry}
+          onFormChange={setFormData}
+          onSave={handleSaveMinistry}
+          onCancel={() => setView('list')}
+        />
+      )}
 
-  if (activeView === 'details' && selectedMinistry) {
-    return (
-      <MinistryDetailsView
-        ministry={selectedMinistry}
-        members={members}
-        schedules={schedules}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onBack={() => setActiveView('list')}
-        onEdit={() => handleEditMinistry(selectedMinistry)}
-      />
-    );
-  }
-
-  return null;
+      {viewingMinistry && (
+        <MinistryViewModal
+          ministry={viewingMinistry}
+          pessoas={pessoas}
+          onClose={() => setViewingMinistry(null)}
+          onEdit={() => {
+            handleEditMinistry(viewingMinistry);
+            setViewingMinistry(null);
+          }}
+          onReload={loadMinistries}
+        />
+      )}
+    </>
+  );
 }
